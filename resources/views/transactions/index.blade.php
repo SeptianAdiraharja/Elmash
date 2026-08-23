@@ -44,15 +44,15 @@
     <!-- Filters & Actions Bar -->
     <div class="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-xs space-y-4">
         <form method="GET" action="{{ route('transactions.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
-            
+
             <!-- Search -->
             <div class="lg:col-span-1">
                 <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Cari Faktur / Pembeli</label>
                 <div class="relative">
-                    <input type="text" 
-                           name="search" 
-                           value="{{ $search }}" 
-                           placeholder="No faktur, pelanggan..." 
+                    <input type="text"
+                           name="search"
+                           value="{{ $search }}"
+                           placeholder="No faktur, pelanggan..."
                            class="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
                     <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-3"></i>
                 </div>
@@ -61,18 +61,18 @@
             <!-- Start Date -->
             <div>
                 <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Dari Tanggal</label>
-                <input type="date" 
-                       name="start_date" 
-                       value="{{ $startDate }}" 
+                <input type="date"
+                       name="start_date"
+                       value="{{ $startDate }}"
                        class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
             </div>
 
             <!-- End Date -->
             <div>
                 <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Sampai Tanggal</label>
-                <input type="date" 
-                       name="end_date" 
-                       value="{{ $endDate }}" 
+                <input type="date"
+                       name="end_date"
+                       value="{{ $endDate }}"
                        class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
             </div>
 
@@ -115,10 +115,17 @@
                 </a>
             </div>
 
-            <a href="{{ route('transactions.create') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-sm shadow-emerald-600/20">
-                <i data-lucide="plus" class="w-4 h-4"></i>
-                <span>Catat Transaksi Baru</span>
-            </a>
+            <div class="flex items-center gap-2">
+                <a href="{{ route('transactions.import') }}" class="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition border border-slate-200">
+                    <i data-lucide="upload" class="w-4 h-4"></i>
+                    <span>Import Excel</span>
+                </a>
+
+                <a href="{{ route('transactions.create') }}" class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-sm shadow-emerald-600/20">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span>Catat Transaksi Baru</span>
+                </a>
+            </div>
         </div>
     </div>
 

@@ -38,6 +38,8 @@ Route::middleware('auth')->group(function () {
     // Sales Transactions CRUD & Export
     Route::get('/transactions/export/pdf', [SalesTransactionController::class, 'exportPdf'])->name('transactions.export.pdf');
     Route::get('/transactions/export/excel', [SalesTransactionController::class, 'exportExcel'])->name('transactions.export.excel');
+    Route::get('transactions/import', [SalesTransactionController::class, 'importForm'])->name('transactions.import');
+    Route::post('transactions/import', [SalesTransactionController::class, 'importStore'])->name('transactions.import.store');
     Route::resource('transactions', SalesTransactionController::class);
 
     // K-Means Clustering Studio, History, Compare & Export

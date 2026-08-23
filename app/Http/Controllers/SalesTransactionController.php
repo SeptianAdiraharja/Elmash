@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Category;
 use App\Models\Product;
 use App\Models\SalesTransaction;
 use App\Models\SalesTransactionItem;
@@ -10,10 +11,57 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class SalesTransactionController extends Controller
 {
     protected ExportService $exportService;
+
+    /**
+     * Konfigurasi pemetaan sheet Excel -> produk yang akan dibuat/dipakai.
+     * Sesuaikan di sini kalau nama sheet, kode produk, atau kategori berubah.
+     */
+    private const SHEET_MAP = [
+        'Dried Lemoen' => [
+            'product_code'   => 'ELM-DRL-KG',
+            'product_name'   => 'Dried Lemoen (Curah KG)',
+            'unit'           => 'KG',
+            'unit_label'     => 'kg',
+            'category_slug'  => 'makanan-olahan-lemon',
+            'category_name'  => 'Makanan & Olahan Kulit Lemon',
+        ],
+        'Manisan Lemon' => [
+            'product_code'   => 'ELM-MSN',
+            'product_name'   => 'Manisan Lemon',
+            'unit'           => 'Pouch',
+            'unit_label'     => 'pouch',
+            'category_slug'  => 'makanan-olahan-lemon',
+            'category_name'  => 'Makanan & Olahan Kulit Lemon',
+        ],
+        'Sari Lemon' => [
+            'product_code'   => 'ELM-SRL-LTR',
+            'product_name'   => 'Sari Lemon (Curah Liter)',
+            'unit'           => 'Liter',
+            'unit_label'     => 'L',
+            'category_slug'  => 'sari-ekstrak-lemon',
+            'category_name'  => 'Sari & Ekstrak Lemon Murni',
+        ],
+    ];
+
+    /** User ID yang dicatat sebagai pembuat transaksi hasil import. */
+    private const IMPORT_USER_ID = 1;
+
+    /**
+     * @return array<string, string> product_code => unit_label (untuk teks notes)
+     */
+    private function unitLabelsByCode(): array
+    {
+        $labels = [];
+        foreach (self::SHEET_MAP as $config) {
+            $labels[$config['product_code']] = $config['unit_label'];
+        }
+        return $labels;
+    }
 
     public function __construct(ExportService $exportService)
     {
@@ -224,5 +272,241 @@ class SalesTransactionController extends Controller
         $endDate = $request->get('end_date', Carbon::now()->format('Y-m-d'));
 
         return $this->exportService->exportSalesExcel($startDate, $endDate);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | IMPORT DATA PENJUALAN DARI EXCEL (Dried Lemoen / Manisan Lemon / Sari Lemon)
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Tampilkan form upload file Excel.
+     */
+    public function importForm()
+    {
+        return view('transactions.import');
+    }
+
+    /**
+     * Proses file Excel: baca 3 sheet, gabungkan per tanggal jadi 1 SalesTransaction
+     * berisi 3 item produk, lalu update stok produk dari kolom SISA terakhir.
+     */
+    public function importStore(Request $request)
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:xlsx,xls'],
+        ], [
+            'file.required' => 'File Excel wajib diupload.',
+            'file.mimes' => 'File harus berformat .xlsx atau .xls.',
+        ]);
+
+        try {
+            $products = $this->ensureImportProducts();
+
+            $spreadsheet = IOFactory::load($request->file('file')->getRealPath());
+
+            // dailyData[Y-m-d][product_code] = ['po' => x, 'kirim' => y, 'sisa' => z]
+            $dailyData = [];
+
+            foreach (self::SHEET_MAP as $sheetKey => $config) {
+                $sheet = $this->findSheetByName($spreadsheet, $sheetKey);
+                if (!$sheet) {
+                    continue; // sheet tidak ditemukan di file ini, lewati
+                }
+
+                $rows = $sheet->toArray(null, true, true, false);
+
+                foreach ($rows as $i => $row) {
+                    if ($i === 0) continue; // baris header
+
+                    $rawDate = trim((string) ($row[0] ?? ''));
+                    $date = $this->parseIndonesianDate($rawDate);
+                    if (!$date) continue; // gagal parse (baris kosong / "TOTAL (DUMMY)")
+
+                    $dateKey = $date->format('Y-m-d');
+                    $po = (float) ($row[1] ?? 0);
+                    $kirim = (float) ($row[2] ?? 0);
+                    $sisa = (float) ($row[3] ?? 0);
+
+                    $dailyData[$dateKey][$config['product_code']] = [
+                        'po' => $po,
+                        'kirim' => $kirim,
+                        'sisa' => $sisa,
+                    ];
+                }
+            }
+
+            if (empty($dailyData)) {
+                return back()->with('error', 'Tidak ada data valid yang ditemukan di file Excel. Pastikan nama sheet sesuai: '
+                    . implode(', ', array_keys(self::SHEET_MAP)));
+            }
+
+            ksort($dailyData); // urutkan tanggal ascending
+
+            $imported = 0;
+            $skipped = 0;
+            $lastSisa = []; // product_code => sisa terakhir yang ditemukan
+
+            $unitLabels = $this->unitLabelsByCode();
+
+            DB::transaction(function () use ($dailyData, $products, $unitLabels, &$imported, &$skipped, &$lastSisa) {
+                foreach ($dailyData as $dateKey => $productsOnThisDate) {
+                    $invoiceNumber = 'INV-IMPORT-' . str_replace('-', '', $dateKey);
+
+                    if (SalesTransaction::where('invoice_number', $invoiceNumber)->exists()) {
+                        $skipped++;
+                        continue;
+                    }
+
+                    $subtotal = 0;
+                    $itemsToCreate = [];
+                    $notesParts = [];
+
+                    foreach ($productsOnThisDate as $code => $data) {
+                        $product = $products[$code] ?? null;
+                        if (!$product) continue;
+
+                        $qty = (int) round($data['kirim']);
+                        $price = (float) $product->selling_price; // masih 0 sampai diisi manual
+                        $rowSubtotal = $qty * $price;
+                        $rawLemon = $qty * (float) $product->raw_lemon_requirement;
+
+                        $subtotal += $rowSubtotal;
+
+                        $itemsToCreate[] = [
+                            'product_id' => $product->id,
+                            'product_name' => $product->name,
+                            'product_code' => $product->code,
+                            'quantity' => $qty,
+                            'unit_price' => $price,
+                            'cost_price' => (float) $product->cost_price,
+                            'subtotal' => $rowSubtotal,
+                            'raw_lemon_used' => $rawLemon,
+                        ];
+
+                        $unitLabel = $unitLabels[$code] ?? '';
+                        $poFormatted = rtrim(rtrim(number_format($data['po'], 2, ',', '.'), '0'), ',');
+
+                        $notesParts[] = "{$product->name}: {$poFormatted} {$unitLabel}";
+
+                        // Simpan sisa terakhir per produk (data terurut tanggal ascending
+                        // jadi nilai ini otomatis akan jadi nilai TERAKHIR setelah loop selesai)
+                        $lastSisa[$code] = $data['sisa'];
+                    }
+
+                    if (empty($itemsToCreate)) continue;
+
+                    $transaction = SalesTransaction::create([
+                        'invoice_number' => $invoiceNumber,
+                        'transaction_date' => $dateKey,
+                        'customer_name' => 'Data Historis (Import Excel)',
+                        'customer_phone' => null,
+                        'sales_channel' => 'Import Data Historis',
+                        'payment_method' => 'Tidak Diketahui (Import)',
+                        'payment_status' => 'Lunas',
+                        'subtotal' => $subtotal,
+                        'discount' => 0,
+                        'tax' => 0,
+                        'total_amount' => $subtotal,
+                        'notes' => 'MASUK P.O — ' . implode(', ', $notesParts),
+                        'created_by' => self::IMPORT_USER_ID,
+                    ]);
+
+                    foreach ($itemsToCreate as $it) {
+                        $it['sales_transaction_id'] = $transaction->id;
+                        SalesTransactionItem::create($it);
+                    }
+
+                    $imported++;
+                }
+
+                // Update stok produk ke nilai SISA terakhir yang ditemukan di data
+                foreach ($lastSisa as $code => $sisa) {
+                    if (isset($products[$code])) {
+                        $products[$code]->update(['stock' => (int) round($sisa)]);
+                    }
+                }
+            });
+
+            return redirect()->route('transactions.index')->with('success',
+                "Import selesai: {$imported} transaksi harian berhasil dibuat, {$skipped} tanggal dilewati (sudah pernah diimpor sebelumnya). "
+                . "Harga jual produk hasil import masih Rp 0 — silakan update manual di halaman Produk."
+            );
+        } catch (\Exception $e) {
+            return back()->with('error', 'Gagal memproses file: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Pastikan kategori & 3 produk baru (Dried Lemoen, Manisan Lemon, Sari Lemon) ada di database.
+     * Aman dipanggil berulang kali (idempoten) — tidak akan membuat duplikat.
+     *
+     * @return array<string, Product> product_code => Product
+     */
+    private function ensureImportProducts(): array
+    {
+        $result = [];
+
+        foreach (self::SHEET_MAP as $config) {
+            $category = Category::firstOrCreate(
+                ['slug' => $config['category_slug']],
+                ['name' => $config['category_name'], 'description' => null]
+            );
+
+            $product = Product::firstOrCreate(
+                ['code' => $config['product_code']],
+                [
+                    'category_id' => $category->id,
+                    'name' => $config['product_name'],
+                    'unit' => $config['unit'],
+                    'raw_lemon_requirement' => 0,
+                    'cost_price' => 0,
+                    'selling_price' => 0,
+                    'stock' => 0,
+                    'min_stock_alert' => 10,
+                    'description' => 'Dibuat otomatis dari import data penjualan Excel. Harga perlu diisi manual.',
+                    'is_active' => true,
+                ]
+            );
+
+            $result[$config['product_code']] = $product;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Cari sheet berdasarkan nama, toleran terhadap spasi ekstra di nama sheet
+     * (mis. "Dried Lemoen " dengan spasi di belakang).
+     */
+    private function findSheetByName($spreadsheet, string $name)
+    {
+        foreach ($spreadsheet->getSheetNames() as $sheetName) {
+            if (trim($sheetName) === trim($name)) {
+                return $spreadsheet->getSheetByName($sheetName);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Parse tanggal format "KAMIS,02-01-2025" -> Carbon. Return null untuk baris
+     * yang bukan data tanggal (header, "TOTAL (DUMMY)", baris kosong).
+     */
+    private function parseIndonesianDate(string $raw): ?Carbon
+    {
+        if ($raw === '' || stripos($raw, 'TOTAL') !== false || stripos($raw, 'TANGGAL') !== false) {
+            return null;
+        }
+
+        $parts = explode(',', $raw);
+        $datePart = trim(end($parts));
+
+        try {
+            return Carbon::createFromFormat('d-m-Y', $datePart)->startOfDay();
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 }
