@@ -56,9 +56,6 @@ class ClusteringController extends Controller
         ));
     }
 
-    /**
-     * Save Clustering Result to Database.
-     */
     public function save(Request $request)
     {
         $request->validate([

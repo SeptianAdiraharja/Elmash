@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('clustering_analysis_id')->constrained('clustering_analyses')->onDelete('cascade');
             $table->date('transaction_date');
-            $table->string('day_name')->nullable();
+            $table->string('day_name'); // mis. "Kamis, 02-01-2025"
             $table->integer('x1_dried_lemon_kg')->default(0);
             $table->integer('x2_manisan_lemon_pouch')->default(0);
             $table->integer('x3_sari_lemon_liter')->default(0);
@@ -20,7 +20,7 @@ return new class extends Migration
             $table->integer('cluster_index')->default(1);
             $table->string('cluster_code', 10)->default('C1');
             $table->string('cluster_label');
-            $table->double('distance_to_centroid')->default(0);
+            $table->double('distance_to_centroid')->nullable();
             $table->text('inventory_strategy')->nullable();
             $table->timestamps();
         });
