@@ -1,36 +1,42 @@
 <?php
 
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
+namespace App\Models;
 
-return new class extends Migration
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class ClusteringResult extends Model
 {
-    public function up(): void
-    {
-        Schema::create('clustering_results', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('clustering_analysis_id')->constrained('clustering_analyses')->onDelete('cascade');
-            $table->foreignId('product_id')->constrained('products')->onDelete('cascade');
-            $table->string('product_name');
-            $table->string('product_code');
-            $table->string('category_name')->nullable();
-            $table->integer('total_qty')->default(0);
-            $table->integer('frequency')->default(0);
-            $table->decimal('total_revenue', 14, 2)->default(0);
-            $table->decimal('raw_lemon_kg', 10, 3)->default(0);
-            $table->json('normalized_vector')->nullable();
-            $table->integer('cluster_index')->default(1);
-            $table->string('cluster_code', 10)->default('C1');
-            $table->string('cluster_label');
-            $table->double('distance_to_centroid')->nullable();
-            $table->text('inventory_strategy')->nullable();
-            $table->timestamps();
-        });
-    }
+    use HasFactory;
 
-    public function down(): void
+    protected $fillable = [
+        'clustering_analysis_id',
+        'transaction_date',
+        'day_name',
+        'x1_dried_lemon_kg',
+        'x2_manisan_lemon_pouch',
+        'x3_sari_lemon_liter',
+        'normalized_vector',
+        'cluster_index',
+        'cluster_code',
+        'cluster_label',
+        'distance_to_centroid',
+        'inventory_strategy',
+    ];
+
+    protected $casts = [
+        'transaction_date' => 'date',
+        'x1_dried_lemon_kg' => 'integer',
+        'x2_manisan_lemon_pouch' => 'integer',
+        'x3_sari_lemon_liter' => 'integer',
+        'normalized_vector' => 'array',
+        'cluster_index' => 'integer',
+        'distance_to_centroid' => 'float',
+    ];
+
+    public function analysis(): BelongsTo
     {
-        Schema::dropIfExists('clustering_results');
+        return $this->belongsTo(ClusteringAnalysis::class, 'clustering_analysis_id');
     }
-};
+}

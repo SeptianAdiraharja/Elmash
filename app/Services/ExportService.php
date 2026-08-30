@@ -19,7 +19,7 @@ class ExportService
      */
     public function exportClusteringPdf(ClusteringAnalysis $analysis)
     {
-        $analysis->load(['results.product.category', 'user']);
+        $analysis->load(['results', 'user']);
 
         $pdf = Pdf::loadView('exports.clustering_pdf', [
             'analysis' => $analysis,
@@ -27,7 +27,7 @@ class ExportService
                 'name' => 'UMKM ELMAS FRESH',
                 'address' => 'Kp. Sirnagalih RT.04/RW.02, Kec. Sukalarang, Kab. Sukabumi, Jawa Barat',
                 'contact' => 'Telp: 0812-8899-7711 | Email: info@elmasfresh.id',
-                'doc_title' => 'LAPORAN HASIL SEGMENTASI PENJUALAN PRODUK OLAHAN LEMON',
+                'doc_title' => 'LAPORAN HASIL SEGMENTASI PENJUALAN HARIAN PRODUK OLAHAN LEMON',
                 'method' => 'Metode Algoritma K-Means Clustering',
             ]
         ])->setPaper('a4', 'portrait');
@@ -41,62 +41,56 @@ class ExportService
      */
     public function exportClusteringExcel(ClusteringAnalysis $analysis): StreamedResponse
     {
-        $analysis->load(['results.product.category']);
+        $analysis->load(['results']); // product/category relation dihapus
+
         $spreadsheet = new Spreadsheet();
 
         // Sheet 1: Hasil Segmentasi
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Hasil Segmentasi');
 
-        // Header Title
         $sheet->setCellValue('A1', 'UMKM ELMAS FRESH - SUKABUMI');
-        $sheet->setCellValue('A2', 'LAPORAN HASIL SEGMENTASI PENJUALAN PRODUK OLAHAN LEMON (K-MEANS CLUSTERING)');
+        $sheet->setCellValue('A2', 'LAPORAN HASIL SEGMENTASI PENJUALAN HARIAN PRODUK OLAHAN LEMON (K-MEANS CLUSTERING)');
         $sheet->setCellValue('A3', 'Periode Analisis: ' . $analysis->period_start->format('d/m/Y') . ' s/d ' . $analysis->period_end->format('d/m/Y') . ' | Jumlah Klaster (k): ' . $analysis->k_value);
         $sheet->getStyle('A1:A3')->getFont()->setBold(true);
 
         // Table Headers
         $headers = [
             'No',
-            'Kode SKU',
-            'Nama Produk Olahan Lemon',
-            'Kategori',
-            'Total Qty (Unit)',
-            'Frekuensi Transaksi',
-            'Total Omset (Rp)',
-            'Total Lemon Segar (Kg)',
+            'Tanggal Transaksi',
+            'Hari',
+            'X1 - Dried Lemon Terkirim (Kg)',
+            'X2 - Manisan Lemon Terkirim (Pouch)',
+            'X3 - Sari Lemon Terkirim (Liter)',
             'Kode Klaster',
             'Label Kategori Penjualan',
-            'Rekomendasi Manajemen Stok & Produksi'
+            'Rekomendasi Manajemen Stok & Produksi',
         ];
 
         $sheet->fromArray($headers, null, 'A5');
-        $sheet->getStyle('A5:K5')->getFont()->setBold(true);
-        $sheet->getStyle('A5:K5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFFACC15');
+        $sheet->getStyle('A5:I5')->getFont()->setBold(true);
+        $sheet->getStyle('A5:I5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFFACC15');
 
         $row = 6;
         foreach ($analysis->results as $idx => $res) {
             $sheet->setCellValue('A' . $row, $idx + 1);
-            $sheet->setCellValue('B' . $row, $res->product_code);
-            $sheet->setCellValue('C' . $row, $res->product_name);
-            $sheet->setCellValue('D' . $row, $res->category_name);
-            $sheet->setCellValue('E' . $row, $res->total_qty);
-            $sheet->setCellValue('F' . $row, $res->frequency);
-            $sheet->setCellValue('G' . $row, $res->total_revenue);
-            $sheet->setCellValue('H' . $row, $res->raw_lemon_kg);
-            $sheet->setCellValue('I' . $row, $res->cluster_code);
-            $sheet->setCellValue('J' . $row, $res->cluster_label);
-            $sheet->setCellValue('K' . $row, $res->inventory_strategy);
+            $sheet->setCellValueExplicit('B' . $row, $res->transaction_date->format('d/m/Y'), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $sheet->setCellValue('C' . $row, $res->day_name);
+            $sheet->setCellValue('D' . $row, $res->x1_dried_lemon_kg);
+            $sheet->setCellValue('E' . $row, $res->x2_manisan_lemon_pouch);
+            $sheet->setCellValue('F' . $row, $res->x3_sari_lemon_liter);
+            $sheet->setCellValue('G' . $row, $res->cluster_code);
+            $sheet->setCellValue('H' . $row, $res->cluster_label);
+            $sheet->setCellValue('I' . $row, $res->inventory_strategy);
             $row++;
         }
 
-        // Format Currency & Numbers
+        // Format Numbers
+        $sheet->getStyle('D6:D' . ($row - 1))->getNumberFormat()->setFormatCode('#,##0');
         $sheet->getStyle('E6:E' . ($row - 1))->getNumberFormat()->setFormatCode('#,##0');
         $sheet->getStyle('F6:F' . ($row - 1))->getNumberFormat()->setFormatCode('#,##0');
-        $sheet->getStyle('G6:G' . ($row - 1))->getNumberFormat()->setFormatCode('"Rp "#,##0');
-        $sheet->getStyle('H6:H' . ($row - 1))->getNumberFormat()->setFormatCode('#,##0.00" Kg"');
 
-        // Auto width
-        foreach (range('A', 'K') as $col) {
+        foreach (range('A', 'I') as $col) {
             $sheet->getColumnDimension($col)->setAutoSize(true);
         }
 
@@ -106,11 +100,18 @@ class ExportService
         $sheet2->setCellValue('A1', 'RINGKASAN METRIK KLASTER K-MEANS');
         $sheet2->getStyle('A1')->getFont()->setBold(true);
 
-        $summaryHeaders = ['Klaster', 'Kategori', 'Jumlah Produk', 'Total Penjualan (Qty)', 'Rata-rata Qty', 'Total Omset (Rp)', 'Total Kebutuhan Lemon (Kg)'];
+        $summaryHeaders = [
+            'Klaster',
+            'Kategori',
+            'Jumlah Hari',
+            'Rata-rata X1 Dried Lemon (Kg)',
+            'Rata-rata X2 Manisan Lemon (Pouch)',
+            'Rata-rata X3 Sari Lemon (Liter)',
+        ];
         $sheet2->fromArray($summaryHeaders, null, 'A3');
-        $sheet2->getStyle('A3:G3')->getFont()->setBold(true);
-        $sheet2->getStyle('A3:G3')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF059669');
-        $sheet2->getStyle('A3:G3')->getFont()->getColor()->setARGB('FFFFFFFF');
+        $sheet2->getStyle('A3:F3')->getFont()->setBold(true);
+        $sheet2->getStyle('A3:F3')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF059669');
+        $sheet2->getStyle('A3:F3')->getFont()->getColor()->setARGB('FFFFFFFF');
 
         $sRow = 4;
         if (is_array($analysis->cluster_summary)) {
@@ -118,20 +119,16 @@ class ExportService
                 $sheet2->setCellValue('A' . $sRow, $code);
                 $sheet2->setCellValue('B' . $sRow, $summ['cluster_label'] ?? '-');
                 $sheet2->setCellValue('C' . $sRow, $summ['member_count'] ?? 0);
-                $sheet2->setCellValue('D' . $sRow, $summ['total_qty'] ?? 0);
-                $sheet2->setCellValue('E' . $sRow, $summ['avg_qty'] ?? 0);
-                $sheet2->setCellValue('F' . $sRow, $summ['total_revenue'] ?? 0);
-                $sheet2->setCellValue('G' . $sRow, $summ['total_raw_lemon_kg'] ?? 0);
+                $sheet2->setCellValue('D' . $sRow, $summ['avg_x1_dried_lemon_kg'] ?? 0);
+                $sheet2->setCellValue('E' . $sRow, $summ['avg_x2_manisan_lemon_pouch'] ?? 0);
+                $sheet2->setCellValue('F' . $sRow, $summ['avg_x3_sari_lemon_liter'] ?? 0);
                 $sRow++;
             }
         }
 
-        $sheet2->getStyle('D4:D' . ($sRow - 1))->getNumberFormat()->setFormatCode('#,##0');
-        $sheet2->getStyle('E4:E' . ($sRow - 1))->getNumberFormat()->setFormatCode('#,##0.00');
-        $sheet2->getStyle('F4:F' . ($sRow - 1))->getNumberFormat()->setFormatCode('"Rp "#,##0');
-        $sheet2->getStyle('G4:G' . ($sRow - 1))->getNumberFormat()->setFormatCode('#,##0.00" Kg"');
+        $sheet2->getStyle('D4:F' . ($sRow - 1))->getNumberFormat()->setFormatCode('#,##0.00');
 
-        foreach (range('A', 'G') as $col) {
+        foreach (range('A', 'F') as $col) {
             $sheet2->getColumnDimension($col)->setAutoSize(true);
         }
 

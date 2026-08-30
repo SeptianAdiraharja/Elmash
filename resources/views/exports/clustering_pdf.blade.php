@@ -120,7 +120,7 @@
         </div>
     </div>
 
-    <div class="report-title">LAPORAN HASIL SEGMENTASI PENJUALAN PRODUK OLAHAN LEMON</div>
+    <div class="report-title">LAPORAN HASIL SEGMENTASI PENJUALAN HARIAN PRODUK OLAHAN LEMON</div>
     <div class="report-meta">
         Metode: Algoritma K-Means Clustering | Periode: {{ $analysis->period_start->format('d/m/Y') }} s/d {{ $analysis->period_end->format('d/m/Y') }} | Tanggal Cetak: {{ date('d/m/Y H:i') }}
     </div>
@@ -130,19 +130,20 @@
         &bull; Jumlah Klaster (k): <strong>{{ $analysis->k_value }}</strong> &nbsp;|&nbsp;
         &bull; Jumlah Iterasi Konvergen: <strong>{{ $analysis->iterations_count }}</strong> &nbsp;|&nbsp;
         &bull; Sum of Squared Errors (SSE): <strong>{{ $analysis->sse_inertia }}</strong> &nbsp;|&nbsp;
-        &bull; Davies-Bouldin Index (DBI): <strong>{{ $analysis->davies_bouldin_index }}</strong>
+        &bull; Davies-Bouldin Index (DBI): <strong>{{ $analysis->davies_bouldin_index }}</strong> &nbsp;|&nbsp;
+        &bull; Total Data: <strong>{{ $analysis->results->count() }} Hari</strong>
     </div>
 
-    <div class="section-title">1. Ringkasan Karakteristik Klaster Penjualan</div>
+    <div class="section-title">1. Ringkasan Karakteristik Klaster Penjualan Harian</div>
     <table>
         <thead>
             <tr>
                 <th style="width: 10%;">Klaster</th>
-                <th style="width: 30%;">Klasifikasi Kategori</th>
-                <th style="width: 15%; text-align: center;">Jumlah Produk</th>
-                <th style="width: 15%; text-align: right;">Total Qty Terjual</th>
-                <th style="width: 15%; text-align: right;">Total Omset (Rp)</th>
-                <th style="width: 15%; text-align: right;">Kebutuhan Lemon (Kg)</th>
+                <th style="width: 26%;">Klasifikasi Kategori</th>
+                <th style="width: 12%; text-align: center;">Jumlah Hari</th>
+                <th style="width: 17%; text-align: right;">Rata-rata X1 (Kg)</th>
+                <th style="width: 17%; text-align: right;">Rata-rata X2 (Pouch)</th>
+                <th style="width: 18%; text-align: right;">Rata-rata X3 (Liter)</th>
             </tr>
         </thead>
         <tbody>
@@ -151,42 +152,42 @@
                     <tr>
                         <td class="text-center text-bold">{{ $code }}</td>
                         <td>{{ $s['cluster_label'] ?? '-' }}</td>
-                        <td class="text-center">{{ $s['member_count'] ?? 0 }} varian</td>
-                        <td class="text-right text-bold">{{ number_format($s['total_qty'] ?? 0, 0, ',', '.') }}</td>
-                        <td class="text-right text-bold">Rp {{ number_format($s['total_revenue'] ?? 0, 0, ',', '.') }}</td>
-                        <td class="text-right text-bold">{{ number_format($s['total_raw_lemon_kg'] ?? 0, 1, ',', '.') }} Kg</td>
+                        <td class="text-center">{{ $s['member_count'] ?? 0 }} hari</td>
+                        <td class="text-right text-bold">{{ number_format($s['avg_x1_dried_lemon_kg'] ?? 0, 2, ',', '.') }}</td>
+                        <td class="text-right text-bold">{{ number_format($s['avg_x2_manisan_lemon_pouch'] ?? 0, 0, ',', '.') }}</td>
+                        <td class="text-right text-bold">{{ number_format($s['avg_x3_sari_lemon_liter'] ?? 0, 0, ',', '.') }}</td>
                     </tr>
                 @endforeach
             @endif
         </tbody>
     </table>
 
-    <div class="section-title">2. Detail Hasil Segmentasi Produk & Rekomendasi Alokasi Bahan Baku</div>
+    <div class="section-title">2. Detail Hasil Segmentasi Harian & Rekomendasi Alokasi Bahan Baku</div>
     <table>
         <thead>
             <tr>
                 <th style="width: 4%;">No</th>
-                <th style="width: 12%;">Kode SKU</th>
-                <th style="width: 26%;">Nama Produk Olahan</th>
-                <th style="width: 10%; text-align: center;">Klaster</th>
-                <th style="width: 10%; text-align: right;">Total Qty</th>
-                <th style="width: 14%; text-align: right;">Total Omset</th>
-                <th style="width: 24%;">Rekomendasi Manajemen Stok</th>
+                <th style="width: 16%;">Tanggal</th>
+                <th style="width: 9%; text-align: center;">Klaster</th>
+                <th style="width: 12%; text-align: right;">X1 (Kg)</th>
+                <th style="width: 13%; text-align: right;">X2 (Pouch)</th>
+                <th style="width: 12%; text-align: right;">X3 (Liter)</th>
+                <th style="width: 34%;">Rekomendasi Manajemen Stok</th>
             </tr>
         </thead>
         <tbody>
             @foreach($analysis->results as $idx => $r)
                 <tr>
                     <td class="text-center">{{ $idx + 1 }}</td>
-                    <td class="text-bold">{{ $r->product_code }}</td>
-                    <td>{{ $r->product_name }}</td>
+                    <td class="text-bold">{{ $r->day_name }}</td>
                     <td class="text-center">
                         <span class="badge {{ $r->cluster_code == 'C1' ? 'badge-c1' : ($r->cluster_code == 'C2' ? 'badge-c2' : 'badge-c3') }}">
                             {{ $r->cluster_code }}
                         </span>
                     </td>
-                    <td class="text-right text-bold">{{ number_format($r->total_qty, 0, ',', '.') }}</td>
-                    <td class="text-right">Rp {{ number_format($r->total_revenue, 0, ',', '.') }}</td>
+                    <td class="text-right text-bold">{{ number_format($r->x1_dried_lemon_kg, 0, ',', '.') }}</td>
+                    <td class="text-right">{{ number_format($r->x2_manisan_lemon_pouch, 0, ',', '.') }}</td>
+                    <td class="text-right">{{ number_format($r->x3_sari_lemon_liter, 0, ',', '.') }}</td>
                     <td style="font-size: 7.5pt;">{{ $r->inventory_strategy }}</td>
                 </tr>
             @endforeach

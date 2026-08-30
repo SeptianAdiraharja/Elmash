@@ -28,14 +28,13 @@ class ClusteringController extends Controller
      */
     public function index(Request $request)
     {
-        // Default to last 12 months or full available range
-        $startDate = $request->get('start_date', '2025-01-01');
-        $endDate = $request->get('end_date', '2026-04-30');
+        // Default: 300 hari sesuai simulasi skripsi (2 Jan 2025 - 28 Okt 2025)
+        $startDate = $request->get('start_date', '2025-01-02');
+        $endDate = $request->get('end_date', '2025-10-28');
         $kValue = (int) $request->get('k_value', 3);
         $maxIterations = (int) $request->get('max_iterations', 100);
         $initMethod = $request->get('init_method', 'kmeans_plus');
 
-        // Extract dataset for period
         $dataset = $this->kMeansService->extractFeatures($startDate, $endDate);
 
         $clusteringOutput = null;
@@ -46,20 +45,14 @@ class ClusteringController extends Controller
                 $dataset,
                 $kValue,
                 $maxIterations,
-                ['total_qty', 'frequency', 'total_revenue', 'raw_lemon_kg'],
+                ['x1_dried_lemon_kg', 'x2_manisan_lemon_pouch', 'x3_sari_lemon_liter'],
                 $initMethod
             );
         }
 
         return view('clustering.index', compact(
-            'startDate',
-            'endDate',
-            'kValue',
-            'maxIterations',
-            'initMethod',
-            'dataset',
-            'clusteringOutput',
-            'hasRun'
+            'startDate', 'endDate', 'kValue', 'maxIterations', 'initMethod',
+            'dataset', 'clusteringOutput', 'hasRun'
         ));
     }
 
@@ -83,7 +76,11 @@ class ClusteringController extends Controller
         $initMethod = $request->input('init_method', 'kmeans_plus');
 
         $dataset = $this->kMeansService->extractFeatures($startDate, $endDate);
-        $output = $this->kMeansService->runClustering($dataset, $kValue, $maxIterations, ['total_qty', 'frequency', 'total_revenue', 'raw_lemon_kg'], $initMethod);
+        $output = $this->kMeansService->runClustering(
+            $dataset, $kValue, $maxIterations,
+            ['x1_dried_lemon_kg', 'x2_manisan_lemon_pouch', 'x3_sari_lemon_liter'],
+            $initMethod
+        );
 
         DB::beginTransaction();
         try {
@@ -110,14 +107,11 @@ class ClusteringController extends Controller
             foreach ($output['results'] as $res) {
                 ClusteringResult::create([
                     'clustering_analysis_id' => $analysis->id,
-                    'product_id' => $res['product_id'],
-                    'product_name' => $res['product_name'],
-                    'product_code' => $res['product_code'],
-                    'category_name' => $res['category_name'],
-                    'total_qty' => $res['total_qty'],
-                    'frequency' => $res['frequency'],
-                    'total_revenue' => $res['total_revenue'],
-                    'raw_lemon_kg' => $res['raw_lemon_kg'],
+                    'transaction_date' => $res['transaction_date'],
+                    'day_name' => $res['day_name'],
+                    'x1_dried_lemon_kg' => $res['x1_dried_lemon_kg'],
+                    'x2_manisan_lemon_pouch' => $res['x2_manisan_lemon_pouch'],
+                    'x3_sari_lemon_liter' => $res['x3_sari_lemon_liter'],
                     'normalized_vector' => $res['normalized_vector'],
                     'cluster_index' => $res['cluster_index'],
                     'cluster_code' => $res['cluster_code'],
@@ -163,7 +157,6 @@ class ClusteringController extends Controller
         $analysisIdA = $request->get('analysis_a');
         $analysisIdB = $request->get('analysis_b');
 
-        // Default to first two if not selected
         if (!$analysisIdA && $allAnalyses->count() > 0) {
             $analysisIdA = $allAnalyses->first()->id;
         }
@@ -176,76 +169,54 @@ class ClusteringController extends Controller
         $comparison = [];
 
         if ($analysisIdA && $analysisIdB) {
-            $analysisA = ClusteringAnalysis::with('results.product')->find($analysisIdA);
-            $analysisB = ClusteringAnalysis::with('results.product')->find($analysisIdB);
+            $analysisA = ClusteringAnalysis::with('results')->find($analysisIdA);
+            $analysisB = ClusteringAnalysis::with('results')->find($analysisIdB);
 
             if ($analysisA && $analysisB) {
-                $resultsA = $analysisA->results->keyBy('product_id');
-                $resultsB = $analysisB->results->keyBy('product_id');
+                $resultsA = $analysisA->results->keyBy(fn ($r) => $r->transaction_date->toDateString());
+                $resultsB = $analysisB->results->keyBy(fn ($r) => $r->transaction_date->toDateString());
 
-                $allProductIds = $resultsA->keys()->merge($resultsB->keys())->unique();
+                $allDates = $resultsA->keys()->merge($resultsB->keys())->unique()->sort();
 
-                foreach ($allProductIds as $pId) {
-                    $itemA = $resultsA->get($pId);
-                    $itemB = $resultsB->get($pId);
-
-                    $prodName = $itemA ? $itemA->product_name : ($itemB ? $itemB->product_name : 'Produk');
-                    $prodCode = $itemA ? $itemA->product_code : ($itemB ? $itemB->product_code : '-');
-
-                    $qtyA = $itemA ? $itemA->total_qty : 0;
-                    $qtyB = $itemB ? $itemB->total_qty : 0;
-                    $qtyDiff = $qtyB - $qtyA;
-
-                    $revA = $itemA ? (float) $itemA->total_revenue : 0;
-                    $revB = $itemB ? (float) $itemB->total_revenue : 0;
-                    $revDiff = $revB - $revA;
+                foreach ($allDates as $date) {
+                    $itemA = $resultsA->get($date);
+                    $itemB = $resultsB->get($date);
 
                     $clusterA = $itemA ? $itemA->cluster_code : '-';
                     $clusterB = $itemB ? $itemB->cluster_code : '-';
-
                     $rankA = $itemA ? $itemA->cluster_index : 99;
                     $rankB = $itemB ? $itemB->cluster_index : 99;
 
-                    // Movement: Naik (1 is best), Turun, Tetap
                     $trend = 'tetap';
                     if ($rankB < $rankA) {
-                        $trend = 'naik'; // Improved rank (e.g. from C2 to C1)
+                        $trend = 'naik';
                     } elseif ($rankB > $rankA) {
-                        $trend = 'turun'; // Decreased rank (e.g. from C1 to C2)
+                        $trend = 'turun';
                     }
 
                     $comparison[] = [
-                        'product_id' => $pId,
-                        'product_name' => $prodName,
-                        'product_code' => $prodCode,
-                        'item_a' => $itemA,
-                        'item_b' => $itemB,
-                        'qty_a' => $qtyA,
-                        'qty_b' => $qtyB,
-                        'qty_diff' => $qtyDiff,
-                        'rev_a' => $revA,
-                        'rev_b' => $revB,
-                        'rev_diff' => $revDiff,
+                        'transaction_date' => $date,
+                        'day_name' => $itemA ? $itemA->day_name : ($itemB ? $itemB->day_name : '-'),
                         'cluster_a' => $clusterA,
                         'cluster_b' => $clusterB,
                         'trend' => $trend,
+                        'x1_a' => $itemA->x1_dried_lemon_kg ?? 0,
+                        'x1_b' => $itemB->x1_dried_lemon_kg ?? 0,
+                        'x2_a' => $itemA->x2_manisan_lemon_pouch ?? 0,
+                        'x2_b' => $itemB->x2_manisan_lemon_pouch ?? 0,
+                        'x3_a' => $itemA->x3_sari_lemon_liter ?? 0,
+                        'x3_b' => $itemB->x3_sari_lemon_liter ?? 0,
                     ];
                 }
 
-                // Sort comparison by qty diff desc
                 usort($comparison, function ($x, $y) {
-                    return $y['qty_diff'] <=> $x['qty_diff'];
+                    return strcmp($x['transaction_date'], $y['transaction_date']);
                 });
             }
         }
 
         return view('clustering.compare', compact(
-            'allAnalyses',
-            'analysisIdA',
-            'analysisIdB',
-            'analysisA',
-            'analysisB',
-            'comparison'
+            'allAnalyses', 'analysisIdA', 'analysisIdB', 'analysisA', 'analysisB', 'comparison'
         ));
     }
 

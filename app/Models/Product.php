@@ -57,11 +57,6 @@ class Product extends Model
         return $this->hasMany(SalesTransactionItem::class);
     }
 
-    public function clusteringResults(): HasMany
-    {
-        return $this->hasMany(ClusteringResult::class);
-    }
-
     public function getFormattedPriceAttribute(): string
     {
         return 'Rp ' . number_format($this->selling_price, 0, ',', '.');

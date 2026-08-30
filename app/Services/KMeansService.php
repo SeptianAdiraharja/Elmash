@@ -2,64 +2,42 @@
 
 namespace App\Services;
 
-use App\Models\Product;
-use App\Models\SalesTransactionItem;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class KMeansService
 {
     /**
-     * Preprocess sales data for clustering within date range.
+     * Ekstrak fitur X1/X2/X3 teragregasi per hari transaksi dalam rentang tanggal.
      */
     public function extractFeatures(string $startDate, string $endDate): array
     {
-        $products = Product::with('category')->where('is_active', true)->get();
-
-        // Get aggregated metrics for each product in date range
-        $aggregated = DB::table('sales_transaction_items')
+        $rows = DB::table('sales_transaction_items')
             ->join('sales_transactions', 'sales_transactions.id', '=', 'sales_transaction_items.sales_transaction_id')
+            ->join('products', 'products.id', '=', 'sales_transaction_items.product_id')
             ->whereBetween('sales_transactions.transaction_date', [$startDate, $endDate])
             ->where('sales_transactions.payment_status', '!=', 'Dibatalkan')
             ->select(
-                'sales_transaction_items.product_id',
-                DB::raw('SUM(sales_transaction_items.quantity) as total_qty'),
-                DB::raw('COUNT(DISTINCT sales_transactions.id) as frequency'),
-                DB::raw('SUM(sales_transaction_items.subtotal) as total_revenue'),
-                DB::raw('SUM(sales_transaction_items.raw_lemon_used) as raw_lemon_kg')
+                'sales_transactions.transaction_date',
+                DB::raw("SUM(CASE WHEN products.unit = 'Kg' THEN sales_transaction_items.quantity ELSE 0 END) as x1_dried_lemon_kg"),
+                DB::raw("SUM(CASE WHEN products.unit = 'Pouch' THEN sales_transaction_items.quantity ELSE 0 END) as x2_manisan_lemon_pouch"),
+                DB::raw("SUM(CASE WHEN products.unit = 'Liter' THEN sales_transaction_items.quantity ELSE 0 END) as x3_sari_lemon_liter")
             )
-            ->groupBy('sales_transaction_items.product_id')
-            ->get()
-            ->keyBy('product_id');
+            ->groupBy('sales_transactions.transaction_date')
+            ->orderBy('sales_transactions.transaction_date')
+            ->get();
 
         $dataset = [];
-        foreach ($products as $p) {
-            $metric = $aggregated->get($p->id);
-            $qty = $metric ? (int) $metric->total_qty : 0;
-            $freq = $metric ? (int) $metric->frequency : 0;
-            $rev = $metric ? (float) $metric->total_revenue : 0;
-            $rawLemon = $metric ? (float) $metric->raw_lemon_kg : 0;
-
-            // If rawLemon is 0 but qty > 0, compute based on requirement
-            if ($rawLemon <= 0 && $qty > 0) {
-                $rawLemon = $qty * (float) $p->raw_lemon_requirement;
-            }
-
+        foreach ($rows as $row) {
+            $date = Carbon::parse($row->transaction_date);
             $dataset[] = [
-                'product_id' => $p->id,
-                'product_code' => $p->code,
-                'product_name' => $p->name,
-                'category_name' => $p->category ? $p->category->name : 'Umum',
-                'unit' => $p->unit,
-                'selling_price' => (float) $p->selling_price,
-                'cost_price' => (float) $p->cost_price,
-                'raw_lemon_requirement' => (float) $p->raw_lemon_requirement,
+                'transaction_date' => $date->toDateString(),
+                'day_name' => $date->translatedFormat('l, d-m-Y'), // butuh App::setLocale('id')
                 'features' => [
-                    'total_qty' => $qty,
-                    'frequency' => $freq,
-                    'total_revenue' => $rev,
-                    'raw_lemon_kg' => round($rawLemon, 3),
-                ]
+                    'x1_dried_lemon_kg' => (int) $row->x1_dried_lemon_kg,
+                    'x2_manisan_lemon_pouch' => (int) $row->x2_manisan_lemon_pouch,
+                    'x3_sari_lemon_liter' => (int) $row->x3_sari_lemon_liter,
+                ],
             ];
         }
 
@@ -67,18 +45,18 @@ class KMeansService
     }
 
     /**
-     * Run K-Means Clustering Algorithm.
+     * Jalankan algoritma K-Means Clustering.
      */
     public function runClustering(
         array $dataset,
         int $k = 3,
         int $maxIterations = 100,
-        array $selectedFeatures = ['total_qty', 'frequency', 'total_revenue', 'raw_lemon_kg'],
+        array $selectedFeatures = ['x1_dried_lemon_kg', 'x2_manisan_lemon_pouch', 'x3_sari_lemon_liter'],
         string $initMethod = 'kmeans_plus'
     ): array {
         $n = count($dataset);
         if ($n === 0) {
-            throw new \Exception('Data produk tidak ditemukan untuk diproses.');
+            throw new \Exception('Data penjualan harian tidak ditemukan untuk diproses.');
         }
 
         if ($k > $n) {
@@ -126,7 +104,7 @@ class KMeansService
             $clusters = array_fill(0, $k, []);
             $distances = [];
 
-            // Step A: Calculate Euclidean distance & Assign to nearest centroid
+            // Step A: Euclidean distance & assign to nearest centroid
             foreach ($normalizedData as $i => $vector) {
                 $minDist = INF;
                 $assignedCluster = 0;
@@ -153,7 +131,6 @@ class KMeansService
             $newCentroids = [];
             for ($c = 0; $c < $k; $c++) {
                 if (empty($clusters[$c])) {
-                    // Re-seed empty cluster with centroid
                     $newCentroids[$c] = $centroids[$c];
                     continue;
                 }
@@ -169,7 +146,6 @@ class KMeansService
                 $newCentroids[$c] = $meanVector;
             }
 
-            // Record iteration state
             $iterationHistory[] = [
                 'iteration' => $iteration,
                 'centroids_before' => $centroids,
@@ -177,7 +153,7 @@ class KMeansService
                 'cluster_counts' => array_map('count', $clusters),
             ];
 
-            // Step C: Check convergence (centroid movement < 0.0001)
+            // Step C: Check convergence
             $totalShift = 0;
             for ($c = 0; $c < $k; $c++) {
                 $totalShift += $this->euclideanDistance($centroids[$c], $newCentroids[$c], $selectedFeatures);
@@ -190,7 +166,7 @@ class KMeansService
             $centroids = $newCentroids;
         }
 
-        // 3. Compute SSE (Sum of Squared Errors) / Inertia
+        // 3. SSE / WCSS (sesuai Tabel 3.3 skripsi)
         $sse = 0.0;
         foreach ($clusters as $c => $members) {
             foreach ($members as $mIdx) {
@@ -199,88 +175,63 @@ class KMeansService
             }
         }
 
-        // 4. Rank Clusters by Sales Performance (Total Qty & Revenue)
+        // 4. Ranking cluster berdasarkan jumlah nilai centroid ternormalisasi
+        //    (konsisten dengan Tabel 3.11 skripsi: C1 Tinggi > C3 Sedang > C2 Rendah)
         $clusterMetrics = [];
         for ($c = 0; $c < $k; $c++) {
             $memberCount = count($clusters[$c]);
-            $sumQty = 0;
-            $sumRev = 0;
-            $sumFreq = 0;
-            $sumRaw = 0;
+            $sumX1 = 0;
+            $sumX2 = 0;
+            $sumX3 = 0;
 
             foreach ($clusters[$c] as $mIdx) {
-                $sumQty += $dataset[$mIdx]['features']['total_qty'];
-                $sumRev += $dataset[$mIdx]['features']['total_revenue'];
-                $sumFreq += $dataset[$mIdx]['features']['frequency'];
-                $sumRaw += $dataset[$mIdx]['features']['raw_lemon_kg'];
+                $sumX1 += $dataset[$mIdx]['features']['x1_dried_lemon_kg'];
+                $sumX2 += $dataset[$mIdx]['features']['x2_manisan_lemon_pouch'];
+                $sumX3 += $dataset[$mIdx]['features']['x3_sari_lemon_liter'];
             }
 
-            $avgQty = $memberCount > 0 ? $sumQty / $memberCount : 0;
-            $avgRev = $memberCount > 0 ? $sumRev / $memberCount : 0;
+            $centroidScore = array_sum($centroids[$c]); // jumlah X1_norm+X2_norm+X3_norm
 
             $clusterMetrics[$c] = [
                 'raw_cluster_id' => $c,
                 'member_count' => $memberCount,
-                'total_qty' => $sumQty,
-                'avg_qty' => round($avgQty, 2),
-                'total_revenue' => $sumRev,
-                'avg_revenue' => round($avgRev, 2),
-                'total_frequency' => $sumFreq,
-                'total_raw_lemon_kg' => round($sumRaw, 2),
+                'total_x1_dried_lemon_kg' => $sumX1,
+                'avg_x1_dried_lemon_kg' => $memberCount > 0 ? round($sumX1 / $memberCount, 2) : 0,
+                'total_x2_manisan_lemon_pouch' => $sumX2,
+                'avg_x2_manisan_lemon_pouch' => $memberCount > 0 ? round($sumX2 / $memberCount, 2) : 0,
+                'total_x3_sari_lemon_liter' => $sumX3,
+                'avg_x3_sari_lemon_liter' => $memberCount > 0 ? round($sumX3 / $memberCount, 2) : 0,
+                'centroid_score' => round($centroidScore, 5),
                 'centroid_normalized' => $centroids[$c],
             ];
         }
 
-        // Sort descending by avg_qty + avg_revenue to give standard labels:
-        // Rank 1 -> Tinggi (Laris), Rank 2 -> Sedang, Rank 3 -> Rendah
         $rankedClusterIds = array_keys($clusterMetrics);
         usort($rankedClusterIds, function ($a, $b) use ($clusterMetrics) {
-            // Sort by average quantity then revenue
-            if ($clusterMetrics[$a]['avg_qty'] == $clusterMetrics[$b]['avg_qty']) {
-                return $clusterMetrics[$b]['avg_revenue'] <=> $clusterMetrics[$a]['avg_revenue'];
-            }
-            return $clusterMetrics[$b]['avg_qty'] <=> $clusterMetrics[$a]['avg_qty'];
+            return $clusterMetrics[$b]['centroid_score'] <=> $clusterMetrics[$a]['centroid_score'];
         });
 
-        // Define labels based on rank
-        $labelMap = [];
-        $colorMap = [];
-        $strategyMap = [];
         $rankLabels = [
             1 => [
                 'code' => 'C1',
-                'label' => 'Penjualan Tinggi (Sangat Laris)',
+                'label' => 'Penjualan Tinggi',
                 'badge' => 'emerald',
-                'description' => 'Produk unggulan dengan permintaan pasar dan perputaran sangat tinggi.',
-                'strategy' => 'Prioritaskan ketersediaan bahan baku lemon segar utama (buffer stock 20%). Jadwalkan produksi harian berkesinambungan untuk mencegah stockout/kehabisan barang.',
+                'description' => 'Hari dengan volume pengiriman Dried Lemon, Manisan Lemon, dan Sari Lemon yang tinggi.',
+                'strategy' => 'Tingkatkan pengadaan bahan baku lemon segar (buffer stock) untuk mencegah stockout pada pola hari seperti ini.',
             ],
             2 => [
                 'code' => 'C2',
-                'label' => 'Penjualan Sedang (Cukup Diminati)',
+                'label' => 'Penjualan Sedang',
                 'badge' => 'amber',
-                'description' => 'Produk dengan penjualan stabil dan peminat berkala.',
-                'strategy' => 'Terapkan produksi semi-batch mingguan (make-to-stock terukur). Alokasikan bahan baku lemon segar sesuai estimasi PO mingguan agar efisien.',
+                'description' => 'Hari dengan volume penjualan menengah, salah satu variabel bisa menonjol.',
+                'strategy' => 'Alokasikan bahan baku lemon segar sesuai estimasi kebutuhan mingguan, produksi semi-batch.',
             ],
             3 => [
                 'code' => 'C3',
-                'label' => 'Penjualan Rendah (Kurang Diminati)',
+                'label' => 'Penjualan Rendah',
                 'badge' => 'rose',
-                'description' => 'Produk slow-moving dengan volume dan frekuensi penjualan rendah.',
-                'strategy' => 'Batasi pengadaan lemon segar untuk produk ini guna mencegah overstock & pembusukan. Buat paket bundling promo dengan produk C1 atau kaji ulang formulasi/kemasan.',
-            ],
-            4 => [
-                'code' => 'C4',
-                'label' => 'Penjualan Sangat Rendah',
-                'badge' => 'slate',
-                'description' => 'Produk dengan pergerakan minimal.',
-                'strategy' => 'Sistem Make-To-Order (hanya diproduksi jika ada PO khusus). Minimalisir penyimpanan lemon segar untuk varian ini.',
-            ],
-            5 => [
-                'code' => 'C5',
-                'label' => 'Penjualan Khusus / Ekstra Rendah',
-                'badge' => 'purple',
-                'description' => 'Produk niche/musiman.',
-                'strategy' => 'Evaluasi kelayakan kontinuitas produk atau jual musiman.',
+                'description' => 'Hari dengan volume pengiriman ketiga variabel yang rendah.',
+                'strategy' => 'Kurangi pengadaan bahan baku lemon segar pada pola hari seperti ini untuk mencegah overstock/pembusukan.',
             ],
         ];
 
@@ -294,7 +245,7 @@ class KMeansService
                 'label' => 'Klaster ' . $rankNum,
                 'badge' => 'slate',
                 'description' => 'Kategori klaster ke-' . $rankNum,
-                'strategy' => 'Lakukan monitoring berkala atas pergerakan stok.',
+                'strategy' => 'Lakukan monitoring berkala atas pola penjualan harian.',
             ];
 
             $mappingOldToRank[$oldClusterId] = [
@@ -316,27 +267,21 @@ class KMeansService
             $clusterSummary[$meta['code']] = $summaryEntry;
         }
 
-        // 5. Calculate Davies-Bouldin Index (DBI)
+        // 5. Davies-Bouldin Index (validasi tambahan, di luar skripsi tapi tetap berguna)
         $dbi = $this->calculateDaviesBouldinIndex($normalizedData, $clusters, $centroids, $selectedFeatures);
 
-        // 6. Build Final Results per Product
+        // 6. Hasil akhir per hari
         $finalResults = [];
         foreach ($dataset as $idx => $row) {
             $assignedOldCluster = $distances[$idx]['assigned_cluster'];
             $clusterInfo = $mappingOldToRank[$assignedOldCluster];
 
             $finalResults[] = [
-                'product_id' => $row['product_id'],
-                'product_code' => $row['product_code'],
-                'product_name' => $row['product_name'],
-                'category_name' => $row['category_name'],
-                'unit' => $row['unit'],
-                'selling_price' => $row['selling_price'],
-                'cost_price' => $row['cost_price'],
-                'total_qty' => $row['features']['total_qty'],
-                'frequency' => $row['features']['frequency'],
-                'total_revenue' => $row['features']['total_revenue'],
-                'raw_lemon_kg' => $row['features']['raw_lemon_kg'],
+                'transaction_date' => $row['transaction_date'],
+                'day_name' => $row['day_name'],
+                'x1_dried_lemon_kg' => $row['features']['x1_dried_lemon_kg'],
+                'x2_manisan_lemon_pouch' => $row['features']['x2_manisan_lemon_pouch'],
+                'x3_sari_lemon_liter' => $row['features']['x3_sari_lemon_liter'],
                 'normalized_vector' => $normalizedData[$idx],
                 'cluster_index' => $clusterInfo['rank_number'],
                 'cluster_code' => $clusterInfo['cluster_code'],
@@ -348,12 +293,9 @@ class KMeansService
             ];
         }
 
-        // Sort final results by total_qty descending
+        // Urutkan berdasarkan tanggal
         usort($finalResults, function ($a, $b) {
-            if ($a['cluster_index'] == $b['cluster_index']) {
-                return $b['total_qty'] <=> $a['total_qty'];
-            }
-            return $a['cluster_index'] <=> $b['cluster_index'];
+            return strcmp($a['transaction_date'], $b['transaction_date']);
         });
 
         return [
@@ -375,9 +317,6 @@ class KMeansService
         ];
     }
 
-    /**
-     * Initialize centroids using K-Means++ or Spread.
-     */
     private function initializeCentroids(array $data, int $k, array $features, string $method = 'kmeans_plus'): array
     {
         $n = count($data);
@@ -390,7 +329,6 @@ class KMeansService
         }
 
         if ($method === 'spread') {
-            // Pick evenly spaced indices
             $centroids = [];
             $step = max(1, floor($n / $k));
             for ($i = 0; $i < $k; $i++) {
@@ -400,11 +338,9 @@ class KMeansService
             return $centroids;
         }
 
-        // K-Means++ Initialization
+        // K-Means++
         $centroids = [];
-        // First centroid: pick first product or middle
-        $firstIdx = 0;
-        $centroids[] = $data[$firstIdx];
+        $centroids[] = $data[0];
 
         for ($c = 1; $c < $k; $c++) {
             $distancesSq = [];
@@ -423,9 +359,7 @@ class KMeansService
                 $sumDistSq += $dSq;
             }
 
-            // Pick next centroid with probability proportional to D(x)^2
             if ($sumDistSq > 0) {
-                // Find point with highest D(x)^2 for deterministic optimal seed
                 $maxIdx = 0;
                 $maxVal = -1;
                 foreach ($distancesSq as $idx => $val) {
@@ -443,9 +377,6 @@ class KMeansService
         return $centroids;
     }
 
-    /**
-     * Compute Euclidean Distance between two feature vectors.
-     */
     public function euclideanDistance(array $v1, array $v2, array $features): float
     {
         $sum = 0.0;
@@ -458,15 +389,11 @@ class KMeansService
         return sqrt($sum);
     }
 
-    /**
-     * Calculate Davies-Bouldin Index (DBI) for cluster validation.
-     */
     private function calculateDaviesBouldinIndex(array $data, array $clusters, array $centroids, array $features): float
     {
         $k = count($clusters);
         if ($k <= 1) return 0.0;
 
-        // 1. Average distance of all points in cluster i to centroid i (Si)
         $s = [];
         for ($i = 0; $i < $k; $i++) {
             $count = count($clusters[$i]);
@@ -481,7 +408,6 @@ class KMeansService
             $s[$i] = $sumDist / $count;
         }
 
-        // 2. For each cluster i, find max (Si + Sj) / d(Ci, Cj)
         $r = [];
         for ($i = 0; $i < $k; $i++) {
             $maxR = 0.0;
@@ -498,7 +424,6 @@ class KMeansService
             $r[$i] = $maxR;
         }
 
-        // 3. DBI = (1/k) * sum(Ri)
         return array_sum($r) / $k;
     }
 }

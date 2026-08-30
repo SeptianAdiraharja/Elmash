@@ -23,7 +23,7 @@
 
     <!-- Product Dossier Card -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+
         <!-- Left 2 Cols: Main Info -->
         <div class="lg:col-span-2 bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-xs space-y-6">
             <div class="flex items-start justify-between gap-4">

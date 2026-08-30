@@ -12,14 +12,11 @@ class ClusteringResult extends Model
 
     protected $fillable = [
         'clustering_analysis_id',
-        'product_id',
-        'product_name',
-        'product_code',
-        'category_name',
-        'total_qty',
-        'frequency',
-        'total_revenue',
-        'raw_lemon_kg',
+        'transaction_date',
+        'day_name',
+        'x1_dried_lemon_kg',
+        'x2_manisan_lemon_pouch',
+        'x3_sari_lemon_liter',
         'normalized_vector',
         'cluster_index',
         'cluster_code',
@@ -29,10 +26,10 @@ class ClusteringResult extends Model
     ];
 
     protected $casts = [
-        'total_qty' => 'integer',
-        'frequency' => 'integer',
-        'total_revenue' => 'float',
-        'raw_lemon_kg' => 'float',
+        'transaction_date' => 'date',
+        'x1_dried_lemon_kg' => 'integer',
+        'x2_manisan_lemon_pouch' => 'integer',
+        'x3_sari_lemon_liter' => 'integer',
         'normalized_vector' => 'array',
         'cluster_index' => 'integer',
         'distance_to_centroid' => 'float',
@@ -41,10 +38,5 @@ class ClusteringResult extends Model
     public function analysis(): BelongsTo
     {
         return $this->belongsTo(ClusteringAnalysis::class, 'clustering_analysis_id');
-    }
-
-    public function product(): BelongsTo
-    {
-        return $this->belongsTo(Product::class);
     }
 }
