@@ -37,7 +37,7 @@ class DashboardController extends Controller
         $totalProducts = Product::where('is_active', true)->count();
 
         // 2. Latest Clustering Analysis
-        $latestAnalysis = ClusteringAnalysis::with(['results.product.category'])->latest()->first();
+        $latestAnalysis = ClusteringAnalysis::with(['results', 'user'])->latest()->first();
 
         // 3. Top 5 Best-Selling Products
         $topProducts = SalesTransactionItem::whereHas('transaction', function ($q) {
@@ -53,7 +53,7 @@ class DashboardController extends Controller
         $monthlyData = DB::table('sales_transactions')
             ->where('payment_status', '!=', 'Dibatalkan')
             ->select(
-                DB::raw("DATE_FORMAT(transaction_date, '%Y-%m') as month_key"),
+                DB::raw("strftime('%Y-%m', transaction_date) as month_key"),
                 DB::raw('SUM(total_amount) as revenue'),
                 DB::raw('COUNT(id) as tx_count')
             )

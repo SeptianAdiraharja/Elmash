@@ -459,6 +459,7 @@ class SalesTransactionController extends Controller
                 [
                     'category_id' => $category->id,
                     'name' => $config['product_name'],
+                    'slug' => \Illuminate\Support\Str::slug($config['product_name']),
                     'unit' => $config['unit'],
                     'raw_lemon_requirement' => 0,
                     'cost_price' => 0,

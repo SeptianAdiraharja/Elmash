@@ -105,16 +105,7 @@
             <div class="pt-4 border-t border-slate-100">
                 <h5 class="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">Riwayat Klasifikasi Klaster</h5>
                 <div class="space-y-2">
-                    @forelse($product->clusteringResults->take(3) as $cr)
-                        <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs flex items-center justify-between">
-                            <span class="font-medium text-slate-600 truncate max-w-[150px]">{{ $cr->analysis ? $cr->analysis->title : 'Analisis' }}</span>
-                            <span class="px-2 py-0.5 rounded-md text-[10px] font-extrabold {{ $cr->cluster_code == 'C1' ? 'bg-emerald-100 text-emerald-800' : ($cr->cluster_code == 'C2' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800') }}">
-                                {{ $cr->cluster_code }} - {{ $cr->cluster_label }}
-                            </span>
-                        </div>
-                    @empty
-                        <p class="text-xs text-slate-400 italic">Belum ada riwayat klaster.</p>
-                    @endforelse
+                    <p class="text-xs text-slate-400 italic">Segmentasi K-Means dilakukan per hari penjualan, bukan per produk. Lihat menu <a href="{{ route('clustering.history') }}" class="text-emerald-600 hover:underline font-bold">Riwayat Analisis</a> untuk melihat hasil segmentasi.</p>
                 </div>
             </div>
         </div>

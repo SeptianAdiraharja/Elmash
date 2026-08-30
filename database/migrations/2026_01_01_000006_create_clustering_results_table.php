@@ -1,42 +1,33 @@
 <?php
 
-namespace App\Models;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-
-class ClusteringResult extends Model
+return new class extends Migration
 {
-    use HasFactory;
-
-    protected $fillable = [
-        'clustering_analysis_id',
-        'transaction_date',
-        'day_name',
-        'x1_dried_lemon_kg',
-        'x2_manisan_lemon_pouch',
-        'x3_sari_lemon_liter',
-        'normalized_vector',
-        'cluster_index',
-        'cluster_code',
-        'cluster_label',
-        'distance_to_centroid',
-        'inventory_strategy',
-    ];
-
-    protected $casts = [
-        'transaction_date' => 'date',
-        'x1_dried_lemon_kg' => 'integer',
-        'x2_manisan_lemon_pouch' => 'integer',
-        'x3_sari_lemon_liter' => 'integer',
-        'normalized_vector' => 'array',
-        'cluster_index' => 'integer',
-        'distance_to_centroid' => 'float',
-    ];
-
-    public function analysis(): BelongsTo
+    public function up(): void
     {
-        return $this->belongsTo(ClusteringAnalysis::class, 'clustering_analysis_id');
+        Schema::create('clustering_results', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('clustering_analysis_id')->constrained('clustering_analyses')->onDelete('cascade');
+            $table->date('transaction_date');
+            $table->string('day_name')->nullable();
+            $table->integer('x1_dried_lemon_kg')->default(0);
+            $table->integer('x2_manisan_lemon_pouch')->default(0);
+            $table->integer('x3_sari_lemon_liter')->default(0);
+            $table->json('normalized_vector')->nullable();
+            $table->integer('cluster_index')->default(1);
+            $table->string('cluster_code', 10)->default('C1');
+            $table->string('cluster_label');
+            $table->double('distance_to_centroid')->default(0);
+            $table->text('inventory_strategy')->nullable();
+            $table->timestamps();
+        });
     }
-}
+
+    public function down(): void
+    {
+        Schema::dropIfExists('clustering_results');
+    }
+};

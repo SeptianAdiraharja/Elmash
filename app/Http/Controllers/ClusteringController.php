@@ -143,7 +143,7 @@ class ClusteringController extends Controller
      */
     public function show(ClusteringAnalysis $clustering)
     {
-        $clustering->load(['results.product.category', 'user']);
+        $clustering->load(['results', 'user']);
         return view('clustering.show', compact('clustering'));
     }
 
