@@ -1,51 +1,42 @@
 <?php
 
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
+namespace App\Models;
 
-return new class extends Migration
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class ClusteringResult extends Model
 {
-    public function up(): void
+    use HasFactory;
+
+    protected $fillable = [
+        'clustering_analysis_id',
+        'transaction_date',
+        'day_name',
+        'x1_dried_lemon_kg',
+        'x2_manisan_lemon_pouch',
+        'x3_sari_lemon_liter',
+        'normalized_vector',
+        'cluster_index',
+        'cluster_code',
+        'cluster_label',
+        'distance_to_centroid',
+        'inventory_strategy',
+    ];
+
+    protected $casts = [
+        'transaction_date' => 'date',
+        'x1_dried_lemon_kg' => 'integer',
+        'x2_manisan_lemon_pouch' => 'integer',
+        'x3_sari_lemon_liter' => 'integer',
+        'normalized_vector' => 'array',
+        'cluster_index' => 'integer',
+        'distance_to_centroid' => 'float',
+    ];
+
+    public function analysis(): BelongsTo
     {
-        Schema::table('clustering_results', function (Blueprint $table) {
-            $table->date('transaction_date')->after('clustering_analysis_id');
-            $table->string('day_name', 20)->after('transaction_date');
-
-            $table->integer('x1_dried_lemon_kg')->after('day_name');
-            $table->integer('x2_manisan_lemon_pouch')->after('x1_dried_lemon_kg');
-            $table->integer('x3_sari_lemon_liter')->after('x2_manisan_lemon_pouch');
-
-            $table->json('normalized_vector')->after('x3_sari_lemon_liter');
-
-            $table->integer('cluster_index')->after('normalized_vector');
-            $table->string('cluster_code', 10)->after('cluster_index');
-            $table->string('cluster_label')->after('cluster_code');
-
-            $table->decimal('distance_to_centroid', 10, 5)
-                ->after('cluster_label');
-
-            $table->text('inventory_strategy')
-                ->after('distance_to_centroid');
-        });
+        return $this->belongsTo(ClusteringAnalysis::class, 'clustering_analysis_id');
     }
-
-    public function down(): void
-    {
-        Schema::table('clustering_results', function (Blueprint $table) {
-            $table->dropColumn([
-                'transaction_date',
-                'day_name',
-                'x1_dried_lemon_kg',
-                'x2_manisan_lemon_pouch',
-                'x3_sari_lemon_liter',
-                'normalized_vector',
-                'cluster_index',
-                'cluster_code',
-                'cluster_label',
-                'distance_to_centroid',
-                'inventory_strategy',
-            ]);
-        });
-    }
-};
+}
