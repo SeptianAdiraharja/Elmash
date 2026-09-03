@@ -64,7 +64,6 @@
             <p class="text-xs text-slate-500 leading-relaxed">
                 Setiap sheet wajib memiliki kolom
                 <code class="px-1 py-0.5 bg-slate-100 rounded text-[11px] font-mono text-slate-700">TANGGAL</code>,
-                <code class="px-1 py-0.5 bg-slate-100 rounded text-[11px] font-mono text-slate-700">MASUK P.O</code>,
                 <code class="px-1 py-0.5 bg-slate-100 rounded text-[11px] font-mono text-slate-700">KIRIM</code>, dan
                 <code class="px-1 py-0.5 bg-slate-100 rounded text-[11px] font-mono text-slate-700">SISA</code>.
             </p>
