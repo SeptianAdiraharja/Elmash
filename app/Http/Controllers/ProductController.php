@@ -5,11 +5,37 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\SalesTransactionItem;
+use App\Services\ExportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class ProductController extends Controller
 {
+    protected ExportService $exportService;
+
+    public function __construct(ExportService $exportService)
+    {
+        $this->exportService = $exportService;
+    }
+
+    public function exportPdf(Request $request)
+    {
+        return $this->exportService->exportProductsPdf(
+            $request->get('search'),
+            $request->get('category_id'),
+            $request->get('status')
+        );
+    }
+
+    public function exportExcel(Request $request)
+    {
+        return $this->exportService->exportProductsExcel(
+            $request->get('search'),
+            $request->get('category_id'),
+            $request->get('status')
+        );
+    }
+
     public function index(Request $request)
     {
         $search = $request->get('search');

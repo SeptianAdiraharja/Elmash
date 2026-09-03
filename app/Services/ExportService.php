@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ClusteringAnalysis;
+use App\Models\Product;
 use App\Models\SalesTransaction;
 use Barryvdh\DomPDF\Facade\Pdf;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -455,6 +456,161 @@ class ExportService
             str_replace('-', '', $startDate) . '-' .
             str_replace('-', '', $endDate) . '.xlsx';
 
+        $writer = new Xlsx($spreadsheet);
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
+
+    /**
+     * Export Products to PDF.
+     */
+    public function exportProductsPdf(?string $search = null, ?string $categoryId = null, ?string $status = null)
+    {
+        $query = Product::with('category');
+
+        if ($search) {
+            $query->search($search);
+        }
+
+        if ($categoryId) {
+            $query->where('category_id', $categoryId);
+        }
+
+        if ($status !== null && $status !== '') {
+            $query->where('is_active', $status == '1');
+        }
+
+        $products = $query->orderBy('name', 'asc')->get();
+
+        $categoryName = 'Semua Kategori';
+        if ($categoryId) {
+            $cat = \App\Models\Category::find($categoryId);
+            if ($cat) {
+                $categoryName = $cat->name;
+            }
+        }
+
+        $statusLabel = 'Semua Status';
+        if ($status === '1') {
+            $statusLabel = 'Aktif Saja';
+        } elseif ($status === '0') {
+            $statusLabel = 'Non-Aktif Saja';
+        }
+
+        $pdf = Pdf::loadView('exports.products_pdf', [
+            'products' => $products,
+            'categoryName' => $categoryName,
+            'statusLabel' => $statusLabel,
+            'company' => [
+                'name' => 'UMKM ELMAS FRESH',
+                'address' => 'Kp. Sirnagalih RT.04/RW.02, Kec. Sukalarang, Kab. Sukabumi, Jawa Barat',
+                'contact' => 'Telp: 0812-8899-7711 | Email: info@elmasfresh.id',
+                'doc_title' => 'KATALOG MASTER PRODUK OLAHAN LEMON',
+            ]
+        ])->setPaper('a4', 'portrait');
+
+        $pdf->setOptions([
+            'defaultFont' => 'sans-serif',
+            'isHtml5ParserEnabled' => true,
+            'isRemoteEnabled' => true,
+        ]);
+
+        $filename = 'Katalog-Produk-ElmasFresh-' . date('Ymd-His') . '.pdf';
+
+        return $pdf->download($filename);
+    }
+
+    /**
+     * Export Products to Excel.
+     */
+    public function exportProductsExcel(?string $search = null, ?string $categoryId = null, ?string $status = null): StreamedResponse
+    {
+        $query = Product::with('category');
+
+        if ($search) {
+            $query->search($search);
+        }
+
+        if ($categoryId) {
+            $query->where('category_id', $categoryId);
+        }
+
+        if ($status !== null && $status !== '') {
+            $query->where('is_active', $status == '1');
+        }
+
+        $products = $query->orderBy('name', 'asc')->get();
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Data Produk');
+
+        $sheet->setCellValue('A1', 'UMKM ELMAS FRESH - SUKABUMI');
+        $sheet->setCellValue('A2', 'KATALOG MASTER PRODUK OLAHAN LEMON');
+        $sheet->setCellValue('A3', 'Tanggal Unduh: ' . date('d/m/Y H:i') . ' WIB');
+        $sheet->getStyle('A1:A3')->getFont()->setBold(true);
+        $sheet->mergeCells('A1:J1');
+        $sheet->mergeCells('A2:J2');
+        $sheet->mergeCells('A3:J3');
+
+        $headers = [
+            'No',
+            'Kode SKU',
+            'Nama Produk',
+            'Kategori',
+            'Satuan',
+            'Kebutuhan Lemon (Kg/Unit)',
+            'HPP Modal (Rp)',
+            'Harga Jual (Rp)',
+            'Stok',
+            'Status'
+        ];
+
+        $sheet->fromArray($headers, null, 'A5');
+        $headerStyle = $sheet->getStyle('A5:J5');
+        $headerStyle->getFont()->setBold(true);
+        $headerStyle->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF059669');
+        $headerStyle->getFont()->getColor()->setARGB('FFFFFFFF');
+        $headerStyle->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $row = 6;
+        foreach ($products as $idx => $prod) {
+            $sheet->setCellValue('A' . $row, $idx + 1);
+            $sheet->setCellValueExplicit('B' . $row, $prod->code, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $sheet->setCellValue('C' . $row, $prod->name);
+            $sheet->setCellValue('D' . $row, $prod->category ? $prod->category->name : '-');
+            $sheet->setCellValue('E' . $row, $prod->unit);
+            $sheet->setCellValue('F' . $row, $prod->raw_lemon_requirement);
+            $sheet->setCellValue('G' . $row, $prod->cost_price);
+            $sheet->setCellValue('H' . $row, $prod->selling_price);
+            $sheet->setCellValue('I' . $row, $prod->stock);
+            $sheet->setCellValue('J' . $row, $prod->is_active ? 'Aktif' : 'Non-Aktif');
+            $row++;
+        }
+
+        $lastRow = max(6, $row - 1);
+
+        // Formats
+        $sheet->getStyle('A6:A' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('B6:B' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('E6:E' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('I6:J' . $lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $sheet->getStyle('F6:F' . $lastRow)->getNumberFormat()->setFormatCode('#,##0.000');
+        $sheet->getStyle('G6:H' . $lastRow)->getNumberFormat()->setFormatCode('"Rp "#,##0');
+        $sheet->getStyle('I6:I' . $lastRow)->getNumberFormat()->setFormatCode('#,##0');
+
+        $sheet->getStyle('A5:J' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+
+        foreach (range('A', 'J') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $filename = 'Katalog-Produk-ElmasFresh-' . date('Ymd-His') . '.xlsx';
         $writer = new Xlsx($spreadsheet);
 
         return response()->streamDownload(function () use ($writer) {

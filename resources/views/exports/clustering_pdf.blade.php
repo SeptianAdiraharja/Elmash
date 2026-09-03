@@ -256,8 +256,6 @@
     &nbsp;|&nbsp;
     &bull; WCSS / SSE: <strong>{{ number_format($analysis->sse_inertia, 5, ',', '.') }}</strong>
     &nbsp;|&nbsp;
-    &bull; Davies-Bouldin Index: <strong>{{ number_format($analysis->davies_bouldin_index, 4, ',', '.') }}</strong>
-    &nbsp;|&nbsp;
     &bull; Total Data: <strong>{{ $analysis->results->count() }} Hari</strong>
 </div>
 
@@ -396,7 +394,6 @@
 ========================================================== --}}
 @if(!empty($analysis->initial_centroids))
 <div class="centroid-box">
-    <strong style="color: #92400e;">Centroid Awal (Sesuai Skripsi Bab 3):</strong><br>
     <table style="margin-top: 5px; font-size: 8pt;">
         <thead>
             <tr>
@@ -493,22 +490,8 @@
     Nilai tersebut merupakan jumlah kuadrat jarak seluruh data terhadap centroid cluster masing-masing pada hasil akhir proses K-Means.
 </div>
 
-{{-- 3.2 Davies-Bouldin Index --}}
-<div class="sub-title">3.2 Davies-Bouldin Index (DBI)</div>
-
-<div class="formula-box">
-    <div>Evaluasi kualitas cluster juga dilakukan menggunakan Davies-Bouldin Index (DBI).</div>
-    <div class="formula">DBI = (1 / k) &Sigma;<sub>i=1</sub><sup>k</sup> max<sub>j &ne; i</sub> { (S<sub>i</sub> + S<sub>j</sub>) / M<sub>ij</sub> }</div>
-    <div>Nilai DBI yang lebih kecil menunjukkan cluster yang semakin kompak di dalam cluster dan semakin terpisah antar-cluster.</div>
-</div>
-
-<div class="result-box">
-    <strong>Davies-Bouldin Index (DBI):</strong>
-    <strong>{{ number_format($analysis->davies_bouldin_index, 4, ',', '.') }}</strong>
-</div>
-
-{{-- 3.3 Kondisi Konvergensi --}}
-<div class="sub-title">3.3 Kondisi Konvergensi</div>
+{{-- 3.2 Kondisi Konvergensi --}}
+<div class="sub-title">3.2 Kondisi Konvergensi</div>
 
 <div class="note-box">
     Proses iterasi K-Means dilakukan secara berulang dengan tahapan penentuan centroid,
@@ -614,9 +597,7 @@
     Hasil akhir menunjukkan bahwa proses clustering konvergen pada
     iterasi ke-<strong>{{ $analysis->iterations_count }}</strong>
     dengan nilai WCSS/SSE sebesar
-    <strong>{{ number_format($analysis->sse_inertia, 5, ',', '.') }}</strong>
-    dan nilai Davies-Bouldin Index sebesar
-    <strong>{{ number_format($analysis->davies_bouldin_index, 4, ',', '.') }}</strong>.
+    <strong>{{ number_format($analysis->sse_inertia, 5, ',', '.') }}</strong>.
 
     Hasil segmentasi kemudian digunakan sebagai dasar dalam menentukan
     strategi pengelolaan persediaan berdasarkan karakteristik tingkat

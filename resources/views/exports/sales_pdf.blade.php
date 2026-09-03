@@ -377,8 +377,7 @@
             <strong>Parameter Clustering:</strong>
             k = {{ $clusteringOutput['k'] }} &nbsp;|&nbsp;
             Iterasi Konvergen: ke-{{ $clusteringOutput['iterations_count'] }} &nbsp;|&nbsp;
-            WCSS/SSE: {{ number_format($clusteringOutput['sse_inertia'], 5, ',', '.') }} &nbsp;|&nbsp;
-            DBI: {{ number_format($clusteringOutput['davies_bouldin_index'], 4, ',', '.') }}
+            WCSS/SSE: {{ number_format($clusteringOutput['sse_inertia'], 5, ',', '.') }}
         </div>
     </div>
     @endif

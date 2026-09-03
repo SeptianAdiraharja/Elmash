@@ -7,46 +7,78 @@
 @section('content')
 <div class="space-y-6">
 
-    <!-- Top Action Bar -->
-    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-        
-        <!-- Search & Filter Bar -->
-        <form method="GET" action="{{ route('products.index') }}" class="flex flex-wrap items-center gap-3 flex-1">
-            <div class="relative flex-1 min-w-[220px]">
-                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <i data-lucide="search" class="w-4 h-4"></i>
+    <!-- Top Action Bar & Filter Card -->
+    <div class="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+        <form method="GET" action="{{ route('products.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+            
+            <!-- Search -->
+            <div class="lg:col-span-2">
+                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Cari Produk</label>
+                <div class="relative">
+                    <input type="text" 
+                           name="search" 
+                           value="{{ $search }}" 
+                           placeholder="Cari SKU, nama produk..." 
+                           class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3"></i>
                 </div>
-                <input type="text" 
-                       name="search" 
-                       value="{{ $search }}" 
-                       placeholder="Cari SKU, nama produk..." 
-                       class="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition shadow-2xs">
             </div>
 
             <!-- Category Filter -->
-            <select name="category_id" class="px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition shadow-2xs">
-                <option value="">Semua Kategori</option>
-                @foreach($categories as $cat)
-                    <option value="{{ $cat->id }}" {{ $categoryId == $cat->id ? 'selected' : '' }}>{{ $cat->name }}</option>
-                @endforeach
-            </select>
+            <div>
+                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Kategori</label>
+                <select name="category_id" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    <option value="">Semua Kategori</option>
+                    @foreach($categories as $cat)
+                        <option value="{{ $cat->id }}" {{ $categoryId == $cat->id ? 'selected' : '' }}>{{ $cat->name }}</option>
+                    @endforeach
+                </select>
+            </div>
 
-            <button type="submit" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs sm:text-sm font-semibold transition">
-                Filter
-            </button>
+            <!-- Status Filter -->
+            <div>
+                <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Status</label>
+                <select name="status" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    <option value="">Semua Status</option>
+                    <option value="1" {{ $status === '1' ? 'selected' : '' }}>Aktif</option>
+                    <option value="0" {{ $status === '0' ? 'selected' : '' }}>Non-Aktif</option>
+                </select>
+            </div>
 
-            @if($search || $categoryId || $status !== null)
-                <a href="{{ route('products.index') }}" class="px-3 py-2 text-xs text-slate-500 hover:text-slate-800 hover:underline">
-                    Reset
-                </a>
-            @endif
+            <!-- Action Buttons -->
+            <div class="flex items-center gap-2">
+                <button type="submit" class="flex-1 py-2 px-3 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
+                    <i data-lucide="filter" class="w-3.5 h-3.5"></i>
+                    <span>Terapkan</span>
+                </button>
+                @if($search || $categoryId || ($status !== null && $status !== ''))
+                    <a href="{{ route('products.index') }}" class="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition" title="Reset Filter">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                    </a>
+                @endif
+            </div>
         </form>
 
-        <!-- Add Button -->
-        <a href="{{ route('products.create') }}" class="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold rounded-xl transition shadow-sm shadow-emerald-600/20 shrink-0">
-            <i data-lucide="plus-circle" class="w-4 h-4"></i>
-            <span>Tambah Produk Baru</span>
-        </a>
+        <!-- Export & Add Quick Action Bar -->
+        <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+            <div class="flex items-center gap-2">
+                <a href="{{ route('products.export.pdf', request()->query()) }}" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl transition border border-rose-200">
+                    <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                    <span>Export PDF</span>
+                </a>
+                <a href="{{ route('products.export.excel', request()->query()) }}" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-xl transition border border-emerald-200">
+                    <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i>
+                    <span>Export Excel</span>
+                </a>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <a href="{{ route('products.create') }}" class="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-sm shadow-emerald-600/20">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                    <span>Tambah Produk Baru</span>
+                </a>
+            </div>
+        </div>
     </div>
 
     <!-- Products Table Card -->
