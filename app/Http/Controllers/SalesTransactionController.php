@@ -247,18 +247,24 @@ class SalesTransactionController extends Controller
 
     public function exportPdf(Request $request)
     {
-        $startDate = $request->get('start_date', Carbon::now()->subMonths(3)->format('Y-m-d'));
-        $endDate = $request->get('end_date', Carbon::now()->format('Y-m-d'));
-
-        return $this->exportService->exportSalesPdf($startDate, $endDate);
+        return $this->exportService->exportSalesPdf(
+            $request->get('start_date'),
+            $request->get('end_date'),
+            $request->get('search'),
+            $request->get('channel'),
+            $request->get('status')
+        );
     }
 
     public function exportExcel(Request $request)
     {
-        $startDate = $request->get('start_date', Carbon::now()->subMonths(3)->format('Y-m-d'));
-        $endDate = $request->get('end_date', Carbon::now()->format('Y-m-d'));
-
-        return $this->exportService->exportSalesExcel($startDate, $endDate);
+        return $this->exportService->exportSalesExcel(
+            $request->get('start_date'),
+            $request->get('end_date'),
+            $request->get('search'),
+            $request->get('channel'),
+            $request->get('status')
+        );
     }
 
     // ============================================================

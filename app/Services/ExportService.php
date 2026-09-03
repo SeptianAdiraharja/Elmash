@@ -12,6 +12,7 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Support\Carbon;
 
 class ExportService
 {
@@ -347,12 +348,35 @@ class ExportService
     /**
      * Export Sales Transactions to PDF.
      */
-    public function exportSalesPdf(string $startDate, string $endDate)
+    public function exportSalesPdf(?string $startDate = null, ?string $endDate = null, ?string $search = null, ?string $channel = null, ?string $status = null)
     {
-        $transactions = SalesTransaction::with(['items.product', 'user'])
-            ->whereBetween('transaction_date', [$startDate, $endDate])
-            ->orderBy('transaction_date', 'asc')
-            ->get();
+        $query = SalesTransaction::with(['items.product', 'user']);
+
+        if ($search) {
+            $query->search($search);
+        }
+
+        if ($startDate && $endDate) {
+            $query->whereBetween('transaction_date', [$startDate, $endDate]);
+        } elseif ($startDate) {
+            $query->where('transaction_date', '>=', $startDate);
+        } elseif ($endDate) {
+            $query->where('transaction_date', '<=', $endDate);
+        }
+
+        if ($channel) {
+            $query->where('sales_channel', $channel);
+        }
+
+        if ($status) {
+            $query->where('payment_status', $status);
+        }
+
+        $transactions = $query->orderBy('transaction_date', 'asc')->get();
+
+        // Jika rentang tanggal tidak dispesifikasikan, ambil dari data aktual
+        $displayStartDate = $startDate ?: ($transactions->min('transaction_date') ? Carbon::parse($transactions->min('transaction_date'))->format('Y-m-d') : date('Y-m-d'));
+        $displayEndDate = $endDate ?: ($transactions->max('transaction_date') ? Carbon::parse($transactions->max('transaction_date'))->format('Y-m-d') : date('Y-m-d'));
 
         $totalRevenue = $transactions->where('payment_status', '!=', 'Dibatalkan')->sum('total_amount');
         $totalItems = $transactions->where('payment_status', '!=', 'Dibatalkan')->sum(function ($tx) {
@@ -361,8 +385,8 @@ class ExportService
 
         $pdf = Pdf::loadView('exports.sales_pdf', [
             'transactions' => $transactions,
-            'startDate' => $startDate,
-            'endDate' => $endDate,
+            'startDate' => $displayStartDate,
+            'endDate' => $displayEndDate,
             'totalRevenue' => $totalRevenue,
             'totalItems' => $totalItems,
             'company' => [
@@ -373,8 +397,8 @@ class ExportService
         ])->setPaper('a4', 'landscape');
 
         $filename = 'Laporan-Penjualan-ElmasFresh-' .
-            str_replace('-', '', $startDate) . '-' .
-            str_replace('-', '', $endDate) . '.pdf';
+            str_replace('-', '', $displayStartDate) . '-' .
+            str_replace('-', '', $displayEndDate) . '.pdf';
 
         return $pdf->download($filename);
     }
@@ -382,12 +406,34 @@ class ExportService
     /**
      * Export Sales Transactions to Excel.
      */
-    public function exportSalesExcel(string $startDate, string $endDate): StreamedResponse
+    public function exportSalesExcel(?string $startDate = null, ?string $endDate = null, ?string $search = null, ?string $channel = null, ?string $status = null): StreamedResponse
     {
-        $transactions = SalesTransaction::with(['items.product', 'user'])
-            ->whereBetween('transaction_date', [$startDate, $endDate])
-            ->orderBy('transaction_date', 'asc')
-            ->get();
+        $query = SalesTransaction::with(['items.product', 'user']);
+
+        if ($search) {
+            $query->search($search);
+        }
+
+        if ($startDate && $endDate) {
+            $query->whereBetween('transaction_date', [$startDate, $endDate]);
+        } elseif ($startDate) {
+            $query->where('transaction_date', '>=', $startDate);
+        } elseif ($endDate) {
+            $query->where('transaction_date', '<=', $endDate);
+        }
+
+        if ($channel) {
+            $query->where('sales_channel', $channel);
+        }
+
+        if ($status) {
+            $query->where('payment_status', $status);
+        }
+
+        $transactions = $query->orderBy('transaction_date', 'asc')->get();
+
+        $displayStartDate = $startDate ?: ($transactions->min('transaction_date') ? Carbon::parse($transactions->min('transaction_date'))->format('d/m/Y') : date('d/m/Y'));
+        $displayEndDate = $endDate ?: ($transactions->max('transaction_date') ? Carbon::parse($transactions->max('transaction_date'))->format('d/m/Y') : date('d/m/Y'));
 
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
@@ -395,7 +441,7 @@ class ExportService
 
         $sheet->setCellValue('A1', 'UMKM ELMAS FRESH - SUKABUMI');
         $sheet->setCellValue('A2', 'LAPORAN TRANSAKSI PENJUALAN PRODUK OLAHAN LEMON');
-        $sheet->setCellValue('A3', 'Periode: ' . $startDate . ' s/d ' . $endDate);
+        $sheet->setCellValue('A3', 'Periode: ' . $displayStartDate . ' s/d ' . $displayEndDate);
         $sheet->getStyle('A1:A3')->getFont()->setBold(true);
         $sheet->mergeCells('A1:K1');
         $sheet->mergeCells('A2:K2');
@@ -443,18 +489,19 @@ class ExportService
             $row++;
         }
 
-        $sheet->getStyle('I6:I' . ($row - 1))->getNumberFormat()->setFormatCode('#,##0');
-        $sheet->getStyle('J6:J' . ($row - 1))->getNumberFormat()->setFormatCode('"Rp "#,##0');
+        $lastRow = max(6, $row - 1);
+        $sheet->getStyle('I6:I' . $lastRow)->getNumberFormat()->setFormatCode('#,##0');
+        $sheet->getStyle('J6:J' . $lastRow)->getNumberFormat()->setFormatCode('"Rp. "#,##0.00');
 
-        $sheet->getStyle('A5:K' . ($row - 1))->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+        $sheet->getStyle('A5:K' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
 
         foreach (range('A', 'K') as $col) {
             $sheet->getColumnDimension($col)->setAutoSize(true);
         }
 
-        $filename = 'Laporan-Penjualan-ElmasFresh-' .
-            str_replace('-', '', $startDate) . '-' .
-            str_replace('-', '', $endDate) . '.xlsx';
+        $fileStartDate = str_replace(['-', '/'], '', $displayStartDate);
+        $fileEndDate = str_replace(['-', '/'], '', $displayEndDate);
+        $filename = 'Laporan-Penjualan-ElmasFresh-' . $fileStartDate . '-' . $fileEndDate . '.xlsx';
 
         $writer = new Xlsx($spreadsheet);
 

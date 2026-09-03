@@ -327,11 +327,11 @@
         </div>
         <div class="summary-card amber">
             <div class="label">Total Omset</div>
-            <div class="value">Rp {{ number_format($totalRevenue, 0, ',', '.') }}</div>
+            <div class="value">Rp. {{ number_format($totalRevenue, 2, '.', '.') }}</div>
         </div>
         <div class="summary-card rose">
             <div class="label">Rata-rata per Nota</div>
-            <div class="value">Rp {{ number_format(count($transactions) > 0 ? $totalRevenue / count($transactions) : 0, 0, ',', '.') }}</div>
+            <div class="value">Rp. {{ number_format(count($transactions) > 0 ? $totalRevenue / count($transactions) : 0, 2, '.', '.') }}</div>
         </div>
     </div>
 
@@ -450,7 +450,7 @@
                         @endif
                     </td>
                     <td class="text-right text-bold">
-                        {{ number_format($t->total_amount, 0, ',', '.') }}
+                        Rp. {{ number_format($t->total_amount, 2, '.', '.') }}
                     </td>
                 </tr>
             @endforeach
@@ -461,7 +461,7 @@
                     Total Keseluruhan
                 </td>
                 <td class="text-right">
-                    Rp {{ number_format($totalRevenue, 0, ',', '.') }}
+                    Rp. {{ number_format($totalRevenue, 2, '.', '.') }}
                 </td>
             </tr>
         </tfoot>
@@ -515,6 +515,7 @@
             </div>
         </div>
     </div>
+
 
 </body>
 </html>

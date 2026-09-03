@@ -102,8 +102,8 @@
                                 </span>
                             </td>
                             <td class="py-3.5 px-4 text-center font-bold text-slate-900">{{ $it->quantity }}</td>
-                            <td class="py-3.5 px-4 text-right text-slate-700">Rp {{ number_format($it->unit_price, 0, ',', '.') }}</td>
-                            <td class="py-3.5 px-4 text-right font-black text-slate-900">Rp {{ number_format($it->subtotal, 0, ',', '.') }}</td>
+                            <td class="py-3.5 px-4 text-right text-slate-700">Rp. {{ number_format($it->unit_price, 2, '.', '.') }}</td>
+                            <td class="py-3.5 px-4 text-right font-black text-slate-900">Rp. {{ number_format($it->subtotal, 2, '.', '.') }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -123,12 +123,12 @@
             <div class="space-y-2 text-xs text-right">
                 <div class="flex justify-between text-slate-600">
                     <span>Subtotal:</span>
-                    <span class="font-semibold text-slate-900">Rp {{ number_format($transaction->subtotal, 0, ',', '.') }}</span>
+                    <span class="font-semibold text-slate-900">Rp. {{ number_format($transaction->subtotal, 2, '.', '.') }}</span>
                 </div>
                 @if($transaction->discount > 0)
                     <div class="flex justify-between text-slate-600">
                         <span>Diskon / Potongan:</span>
-                        <span class="font-semibold text-rose-600">- Rp {{ number_format($transaction->discount, 0, ',', '.') }}</span>
+                        <span class="font-semibold text-rose-600">- Rp. {{ number_format($transaction->discount, 2, '.', '.') }}</span>
                     </div>
                 @endif
                 <div class="flex justify-between text-base font-black text-slate-900 pt-2 border-t border-slate-200">

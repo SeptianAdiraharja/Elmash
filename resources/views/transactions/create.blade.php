@@ -1,3 +1,4 @@
+
 @extends('layouts.app')
 
 @section('title', 'Catat Transaksi Penjualan')
@@ -30,34 +31,34 @@
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                
+
                 <!-- Invoice Number -->
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">No Faktur / Invoice</label>
-                    <input type="text" 
-                           name="invoice_number" 
-                           value="{{ old('invoice_number', $invoiceNumber) }}" 
-                           required 
+                    <input type="text"
+                           name="invoice_number"
+                           value="{{ old('invoice_number', $invoiceNumber) }}"
+                           required
                            class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
 
                 <!-- Transaction Date -->
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">Tanggal Transaksi <span class="text-rose-500">*</span></label>
-                    <input type="date" 
-                           name="transaction_date" 
-                           value="{{ old('transaction_date', date('Y-m-d')) }}" 
-                           required 
+                    <input type="date"
+                           name="transaction_date"
+                           value="{{ old('transaction_date', date('Y-m-d')) }}"
+                           required
                            class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
 
                 <!-- Customer Name -->
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">Nama Pelanggan / Mitra <span class="text-rose-500">*</span></label>
-                    <input type="text" 
-                           name="customer_name" 
-                           value="{{ old('customer_name') }}" 
-                           required 
+                    <input type="text"
+                           name="customer_name"
+                           value="{{ old('customer_name') }}"
+                           required
                            placeholder="Contoh: Toko Berkah / Bu Rahma"
                            class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
@@ -65,9 +66,9 @@
                 <!-- Customer Phone -->
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">No. Telepon / WA Pelanggan</label>
-                    <input type="text" 
-                           name="customer_phone" 
-                           value="{{ old('customer_phone') }}" 
+                    <input type="text"
+                           name="customer_phone"
+                           value="{{ old('customer_phone') }}"
                            placeholder="0812-xxxx-xxxx"
                            class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
@@ -109,9 +110,9 @@
                 <!-- Notes -->
                 <div class="sm:col-span-2">
                     <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">Catatan Tambahan</label>
-                    <input type="text" 
-                           name="notes" 
-                           value="{{ old('notes') }}" 
+                    <input type="text"
+                           name="notes"
+                           value="{{ old('notes') }}"
                            placeholder="Keterangan pengiriman, alamat penerima, nomor resi..."
                            class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
                 </div>
@@ -155,10 +156,10 @@
                             <tr class="hover:bg-slate-50/50">
                                 <!-- Product Select -->
                                 <td class="py-3 px-3">
-                                    <select :name="'items['+index+'][product_id]'" 
-                                            x-model="item.product_id" 
-                                            @change="onProductChange(index)" 
-                                            required 
+                                    <select :name="'items['+index+'][product_id]'"
+                                            x-model="item.product_id"
+                                            @change="onProductChange(index)"
+                                            required
                                             class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500 font-medium text-slate-800">
                                         <option value="">-- Pilih Produk Olahan --</option>
                                         @foreach($products as $p)
@@ -174,29 +175,28 @@
 
                                 <!-- Quantity -->
                                 <td class="py-3 px-3 text-center">
-                                    <input type="number" 
-                                           :name="'items['+index+'][quantity]'" 
-                                           x-model.number="item.quantity" 
-                                           @input="calculateTotals()" 
-                                           min="1" 
-                                           required 
+                                    <input type="number"
+                                           :name="'items['+index+'][quantity]'"
+                                           x-model.number="item.quantity"
+                                           @input="calculateTotals()"
+                                           min="1"
+                                           required
                                            class="w-20 px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-center font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-500">
                                 </td>
 
                                 <!-- Unit Price -->
                                 <td class="py-3 px-3 text-right">
-                                    <input type="number" 
-                                           :name="'items['+index+'][unit_price]'" 
-                                           x-model.number="item.unit_price" 
-                                           @input="calculateTotals()" 
-                                           min="0" 
-                                           required 
+                                    <input type="number"
+                                           :name="'items['+index+'][unit_price]'"
+                                           x-model.number="item.unit_price"
+                                           @input="calculateTotals()"
+                                           min="0"
+                                           required
                                            class="w-28 px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-right font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500">
                                 </td>
 
                                 <!-- Subtotal -->
-                                <td class="py-3 px-3 text-right font-black text-slate-900 text-sm whitespace-nowrap">
-                                    Rp <span x-text="(item.quantity * item.unit_price).toLocaleString('id-ID')"></span>
+                                <td class="py-3 px-3 text-right font-black text-slate-900 text-sm whitespace-nowrap" x-text="formatRupiah(item.quantity * item.unit_price)">
                                 </td>
 
                                 <!-- Remove Action -->
@@ -213,14 +213,14 @@
 
             <!-- Calculation Summary Box -->
             <div class="pt-6 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                
+
                 <!-- Left: Raw Material Lemon Indicator -->
                 <div class="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 flex items-center gap-4">
                     <div class="w-10 h-10 rounded-xl bg-amber-200 text-amber-800 font-black text-lg flex items-center justify-center shrink-0">
                         🍋
                     </div>
                     <div>
-                        <span class="text-[11px] font-bold text-amber-800 uppercase tracking-wider block">Kebutuhan Lemon Segar Transaksi Ini:</span>
+                        <span class="text-[11px] font-bold text-amber-800 uppercase tracking-wider block mb-1">Kebutuhan Lemon Segar Transaksi Ini:</span>
                         <div class="text-lg font-black text-amber-950 mt-0.5">
                             <span x-text="totalLemonKg.toFixed(2)"></span> Kg Lemon Segar
                         </div>
@@ -231,22 +231,22 @@
                 <div class="space-y-3 bg-slate-50 p-5 rounded-2xl border border-slate-100">
                     <div class="flex items-center justify-between text-xs text-slate-600">
                         <span>Subtotal Produk:</span>
-                        <span class="font-bold text-slate-900">Rp <span x-text="subtotalAmount.toLocaleString('id-ID')"></span></span>
+                        <span class="font-bold text-slate-900" x-text="formatRupiah(subtotalAmount)"></span>
                     </div>
 
                     <div class="flex items-center justify-between text-xs text-slate-600">
                         <span>Potongan / Diskon (Rp):</span>
-                        <input type="number" 
-                               name="discount" 
-                               x-model.number="discountAmount" 
-                               @input="calculateTotals()" 
-                               min="0" 
+                        <input type="number"
+                               name="discount"
+                               x-model.number="discountAmount"
+                               @input="calculateTotals()"
+                               min="0"
                                class="w-32 px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs text-right font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500">
                     </div>
 
                     <div class="pt-3 border-t border-slate-200 flex items-center justify-between text-sm">
                         <span class="font-extrabold text-slate-900">Total Akhir:</span>
-                        <span class="font-black text-lg text-emerald-700">Rp <span x-text="grandTotal.toLocaleString('id-ID')"></span></span>
+                        <span class="font-black text-lg text-emerald-700" x-text="formatRupiah(grandTotal)"></span>
                     </div>
                 </div>
 
@@ -325,6 +325,14 @@
                 this.subtotalAmount = sum;
                 this.totalLemonKg = lemonSum;
                 this.grandTotal = Math.max(0, this.subtotalAmount - (parseFloat(this.discountAmount) || 0));
+            },
+
+            formatRupiah(amount) {
+                const val = parseFloat(amount) || 0;
+                return 'Rp. ' + val.toLocaleString('id-ID', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
             },
 
             validateForm(e) {

@@ -47,7 +47,12 @@ class SalesTransaction extends Model
 
     public function getFormattedTotalAttribute(): string
     {
-        return 'Rp ' . number_format($this->total_amount, 0, ',', '.');
+        return 'Rp. ' . number_format($this->total_amount, 2, '.', '.');
+    }
+
+    public function getFormattedSubtotalAttribute(): string
+    {
+        return 'Rp. ' . number_format($this->subtotal, 2, '.', '.');
     }
 
     public function scopeFilterDate($query, $from, $to)
