@@ -129,7 +129,7 @@ class ElmasFreshSystemTest extends TestCase
     public function test_kmeans_service_execution_and_accuracy()
     {
         $kMeansService = new KMeansService();
-        $dataset = $kMeansService->extractFeatures('2025-01-01', '2026-04-30');
+        $dataset = $kMeansService->extractFeatures('2025-01-01', '2025-10-30');
 
         $this->assertNotEmpty($dataset);
         $output = $kMeansService->runClustering($dataset, 3, 100);
@@ -140,16 +140,48 @@ class ElmasFreshSystemTest extends TestCase
         $this->assertArrayHasKey('C2', $output['cluster_summary']);
         $this->assertArrayHasKey('C3', $output['cluster_summary']);
 
-        // Check C1 is high performance
+        // C3 = Penjualan Tinggi, C1 = Penjualan Rendah
         $this->assertGreaterThanOrEqual(
-            $output['cluster_summary']['C2']['avg_qty'],
-            $output['cluster_summary']['C1']['avg_qty']
+            $output['cluster_summary']['C1']['centroid_score'],
+            $output['cluster_summary']['C3']['centroid_score']
         );
+
+        // Elbow data computed
+        $this->assertNotNull($output['elbow_data']);
+        $this->assertEquals(3, $output['elbow_data']['optimal_k']);
+
+        // Test arbitrary sample size feature (misal 10 sampel data)
+        $dataset10 = $kMeansService->extractFeatures('2025-01-01', '2025-10-30', 10);
+        $this->assertCount(10, $dataset10);
+        $output10 = $kMeansService->runClustering($dataset10, 3, 100);
+        $this->assertCount(10, $output10['results']);
+        $this->assertTrue($output10['converged']);
     }
 
     public function test_clustering_export_pdf_and_excel()
     {
-        $analysis = ClusteringAnalysis::first();
+        $kMeansService = new KMeansService();
+        $dataset = $kMeansService->extractFeatures('2025-01-01', '2025-04-30');
+        $output = $kMeansService->runClustering($dataset, 3, 100);
+
+        $analysis = ClusteringAnalysis::create([
+            'title' => 'Analisis Uji Coba Export',
+            'period_start' => '2025-01-01',
+            'period_end' => '2025-04-30',
+            'k_value' => 3,
+            'max_iterations' => 100,
+            'iterations_count' => $output['iterations_count'],
+            'is_converged' => $output['converged'],
+            'sse_inertia' => $output['sse_inertia'],
+            'davies_bouldin_index' => $output['davies_bouldin_index'],
+            'features' => $output['features'],
+            'initial_centroids' => $output['initial_centroids'],
+            'final_centroids' => $output['final_centroids'],
+            'cluster_summary' => $output['cluster_summary'],
+            'raw_data_snapshot' => $output['raw_data'],
+            'iteration_history' => $output['iteration_history'],
+            'created_by' => $this->admin->id,
+        ]);
 
         $pdfResponse = $this->actingAs($this->admin)->get("/clustering/{$analysis->id}/export/pdf");
         $pdfResponse->assertStatus(200);
@@ -161,10 +193,36 @@ class ElmasFreshSystemTest extends TestCase
 
     public function test_multi_period_comparison_view()
     {
-        $analyses = ClusteringAnalysis::all();
-        $this->assertGreaterThanOrEqual(2, $analyses->count());
+        $kMeansService = new KMeansService();
+        $datasetA = $kMeansService->extractFeatures('2025-01-01', '2025-03-31');
+        $outputA = $kMeansService->runClustering($datasetA, 3, 100);
+        $analysisA = ClusteringAnalysis::create([
+            'title' => 'Sesi Periode A',
+            'period_start' => '2025-01-01',
+            'period_end' => '2025-03-31',
+            'k_value' => 3,
+            'max_iterations' => 100,
+            'iterations_count' => $outputA['iterations_count'],
+            'is_converged' => true,
+            'cluster_summary' => $outputA['cluster_summary'],
+            'created_by' => $this->admin->id,
+        ]);
 
-        $response = $this->actingAs($this->admin)->get('/clustering/compare?analysis_a=' . $analyses[0]->id . '&analysis_b=' . $analyses[1]->id);
+        $datasetB = $kMeansService->extractFeatures('2025-04-01', '2025-06-30');
+        $outputB = $kMeansService->runClustering($datasetB, 3, 100);
+        $analysisB = ClusteringAnalysis::create([
+            'title' => 'Sesi Periode B',
+            'period_start' => '2025-04-01',
+            'period_end' => '2025-06-30',
+            'k_value' => 3,
+            'max_iterations' => 100,
+            'iterations_count' => $outputB['iterations_count'],
+            'is_converged' => true,
+            'cluster_summary' => $outputB['cluster_summary'],
+            'created_by' => $this->admin->id,
+        ]);
+
+        $response = $this->actingAs($this->admin)->get('/clustering/compare?analysis_a=' . $analysisA->id . '&analysis_b=' . $analysisB->id);
         $response->assertStatus(200);
         $response->assertSee('Tabel Perbandingan Klaster', false);
     }

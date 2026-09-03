@@ -50,16 +50,21 @@ class DashboardController extends Controller
             ->get();
 
         // 4. Monthly Sales Trends (Last 12 Months)
+        $driver = DB::connection()->getDriverName();
+        $monthKeySql = $driver === 'sqlite' 
+            ? "strftime('%Y-%m', transaction_date)" 
+            : "DATE_FORMAT(transaction_date, '%Y-%m')";
+
         $monthlyData = DB::table('sales_transactions')
-        ->where('payment_status', '!=', 'Dibatalkan')
-        ->select(
-            DB::raw("DATE_FORMAT(transaction_date, '%Y-%m') as month_key"),
-            DB::raw('SUM(total_amount) as revenue'),
-            DB::raw('COUNT(id) as tx_count')
-        )
-        ->groupBy('month_key')
-        ->orderBy('month_key', 'asc')
-        ->get();
+            ->where('payment_status', '!=', 'Dibatalkan')
+            ->select(
+                DB::raw("{$monthKeySql} as month_key"),
+                DB::raw('SUM(total_amount) as revenue'),
+                DB::raw('COUNT(id) as tx_count')
+            )
+            ->groupBy('month_key')
+            ->orderBy('month_key', 'asc')
+            ->get();
 
         $chartMonths = [];
         $chartRevenues = [];

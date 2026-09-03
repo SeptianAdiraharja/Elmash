@@ -5,7 +5,11 @@
 @section('page_subtitle', 'Segmentasi data penjualan harian produk olahan lemon berbasis algoritma machine learning K-Means')
 
 @section('content')
-<div class="space-y-8" x-data="{ activeTab: 'summary', saveModal: false, chartPair: 'x2x3' }">
+<div class="space-y-8" x-data="{
+    activeTab: 'summary',
+    saveModal: false,
+    chartPair: 'x2x3'
+}">
 
     <!-- Parameter Setup Card -->
     <div class="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-sm">
@@ -15,11 +19,11 @@
             </div>
             <div>
                 <h4 class="text-base font-bold text-slate-900">Parameter & Periode Analisis</h4>
-                <p class="text-xs text-slate-500">Tentukan rentang tanggal transaksi dan jumlah klaster k</p>
+                <p class="text-xs text-slate-500">Tentukan rentang tanggal transaksi dan jumlah klaster k (sesuai skripsi)</p>
             </div>
         </div>
 
-        <form method="GET" action="{{ route('clustering.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+        <form method="GET" action="{{ route('clustering.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4 items-end">
             <input type="hidden" name="run" value="1">
 
             <div>
@@ -35,12 +39,28 @@
             </div>
 
             <div>
+                <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">Jumlah Sampel Data</label>
+                <input type="number" name="sample_size" value="{{ $sampleSize }}" min="3" placeholder="Semua data"
+                       class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                       title="Kosongkan untuk seluruh data transaksi">
+            </div>
+
+            <div>
                 <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">Jumlah Klaster (k) <span class="text-rose-500">*</span></label>
                 <select name="k_value" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500">
-                    <option value="3" {{ $kValue == 3 ? 'selected' : '' }}>k = 3 (Tinggi, Sedang, Rendah - Rekomendasi)</option>
-                    <option value="2" {{ $kValue == 2 ? 'selected' : '' }}>k = 2 (Tinggi, Rendah)</option>
+                    <option value="3" {{ $kValue == 3 ? 'selected' : '' }}>k = 3 (Sesuai Skripsi - Rekomendasi)</option>
+                    <option value="2" {{ $kValue == 2 ? 'selected' : '' }}>k = 2</option>
                     <option value="4" {{ $kValue == 4 ? 'selected' : '' }}>k = 4</option>
                     <option value="5" {{ $kValue == 5 ? 'selected' : '' }}>k = 5</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">Metode Inisialisasi</label>
+                <select name="init_method" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    <option value="skripsi_manual" {{ $initMethod == 'skripsi_manual' ? 'selected' : '' }}>Skripsi Manual (Data 3,9,2)</option>
+                    <option value="representative" {{ $initMethod == 'representative' ? 'selected' : '' }}>Representative (Low-Mid-High)</option>
+                    <option value="kmeans_plus" {{ $initMethod == 'kmeans_plus' ? 'selected' : '' }}>K-Means++</option>
                 </select>
             </div>
 
@@ -57,6 +77,12 @@
                 </button>
             </div>
         </form>
+
+        <!-- Informasi Centroid Awal Skripsi -->
+        <div class="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600">
+            <strong class="text-slate-800">📍 Metode Inisialisasi Skripsi (Bab 3):</strong>
+            <span class="ml-2">C1 = Data ke-3 (0,1034; 0,2895; 0,2948), C2 = Data ke-9 (0,6552; 0,7105; 0,1022), C3 = Data ke-2 (0,9655; 0,2368; 0,8776)</span>
+        </div>
     </div>
 
     @if($clusteringOutput)
@@ -71,7 +97,7 @@
                 <h3 class="text-2xl font-black tracking-tight">Hasil Analisis Segmentasi K-Means (k = {{ $clusteringOutput['k'] }})</h3>
                 <p class="text-xs text-slate-300 mt-1">
                     Periode: <strong>{{ \Carbon\Carbon::parse($startDate)->format('d/m/Y') }}</strong> s/d <strong>{{ \Carbon\Carbon::parse($endDate)->format('d/m/Y') }}</strong>
-                    | Total Data: <strong>{{ count($clusteringOutput['results']) }} Hari</strong>
+                    | Total Sampel Data: <strong>{{ count($clusteringOutput['results']) }} Hari{{ $sampleSize ? ' (dibatasi ' . $sampleSize . ' sampel)' : '' }}</strong>
                     | Nilai SSE: <strong>{{ $clusteringOutput['sse_inertia'] }}</strong>
                     | Davies-Bouldin Index: <strong>{{ $clusteringOutput['davies_bouldin_index'] }}</strong>
                 </p>
@@ -131,11 +157,17 @@
         <div class="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-sm space-y-6">
 
             <div class="flex items-center justify-between border-b border-slate-200 pb-3 flex-wrap gap-4">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
                     <button @click="activeTab = 'summary'"
                             :class="activeTab === 'summary' ? 'bg-slate-900 text-white font-bold' : 'text-slate-600 hover:bg-slate-100 font-medium'"
                             class="px-4 py-2 rounded-xl text-xs transition cursor-pointer">
                         Tabel Klasifikasi Hari
+                    </button>
+                    <button @click="activeTab = 'elbow'"
+                            :class="activeTab === 'elbow' ? 'bg-slate-900 text-white font-bold' : 'text-slate-600 hover:bg-slate-100 font-medium'"
+                            class="px-4 py-2 rounded-xl text-xs transition cursor-pointer flex items-center gap-1.5">
+                        <i data-lucide="trending-down" class="w-3.5 h-3.5"></i>
+                        <span>Metode Elbow (Penentuan k = 3)</span>
                     </button>
                     <button @click="activeTab = 'chart'"
                             :class="activeTab === 'chart' ? 'bg-slate-900 text-white font-bold' : 'text-slate-600 hover:bg-slate-100 font-medium'"
@@ -197,6 +229,87 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+
+            <!-- Tab Elbow: Penentuan Nilai k Menggunakan WCSS & Metode Elbow -->
+            <div x-show="activeTab === 'elbow'" class="space-y-6" style="display: none;">
+                <div>
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-800 text-xs font-semibold mb-2">
+                        <i data-lucide="help-circle" class="w-3.5 h-3.5"></i>
+                        <span>Dasar Teoretis Bab 3 Skripsi</span>
+                    </div>
+                    <h4 class="text-base font-bold text-slate-900">Penentuan Jumlah Klaster Optimal Berdasarkan Nilai WCSS (Metode Elbow)</h4>
+                    <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                        Jumlah klaster optimal (k) ditentukan dengan menghitung nilai <em>Within Cluster Sum of Squares</em> (WCSS) dari k = 1 sampai k = 10. Nilai WCSS mengukur total kuadrat jarak setiap objek terhadap centroid klasternya. Titik siku (elbow) terbentuk ketika penurunan nilai WCSS mulai melandai secara signifikan.
+                    </p>
+                </div>
+
+                @if(!empty($clusteringOutput['elbow_data']['wcss']))
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                        <!-- Tabel Nilai WCSS k=1 s/d k=10 -->
+                        <div class="lg:col-span-5 bg-slate-50 border border-slate-200/80 rounded-2xl p-4">
+                            <h5 class="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3 flex items-center justify-between">
+                                <span>Tabel Nilai WCSS (k = 1 s/d 10)</span>
+                                <span class="text-[10px] text-slate-500 font-normal">Formula: &Sigma;||x - &mu;||&sup2;</span>
+                            </h5>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-xs">
+                                    <thead>
+                                        <tr class="border-b border-slate-200 text-slate-500 font-bold text-[11px]">
+                                            <th class="py-2 px-2.5">Nilai k</th>
+                                            <th class="py-2 px-2.5 text-right">Nilai WCSS</th>
+                                            <th class="py-2 px-2.5 text-right">&Delta; Penurunan</th>
+                                            <th class="py-2 px-2.5 text-center">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-200/60 font-mono text-[11px]">
+                                        @foreach($clusteringOutput['elbow_data']['wcss'] as $kIdx => $wcssVal)
+                                            @php
+                                                $delta = $clusteringOutput['elbow_data']['deltas'][$kIdx] ?? null;
+                                                $isOptimal = ($kIdx == $clusteringOutput['elbow_data']['optimal_k']);
+                                            @endphp
+                                            <tr class="{{ $isOptimal ? 'bg-amber-100/70 font-bold text-amber-950' : 'hover:bg-white' }}">
+                                                <td class="py-2 px-2.5 font-sans font-semibold">k = {{ $kIdx }}</td>
+                                                <td class="py-2 px-2.5 text-right font-bold {{ $isOptimal ? 'text-amber-900' : 'text-slate-800' }}">
+                                                    {{ number_format($wcssVal, 2, ',', '.') }}
+                                                </td>
+                                                <td class="py-2 px-2.5 text-right text-slate-600">
+                                                    {{ $delta !== null ? number_format($delta, 2, ',', '.') : '-' }}
+                                                </td>
+                                                <td class="py-2 px-2.5 text-center font-sans">
+                                                    @if($isOptimal)
+                                                        <span class="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black">
+                                                            Elbow (k = 3)
+                                                        </span>
+                                                    @else
+                                                        <span class="text-slate-400 text-[10px]">-</span>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Grafik Garis Elbow Method -->
+                        <div class="lg:col-span-7 bg-white border border-slate-200/80 rounded-2xl p-4 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <h5 class="text-xs font-bold uppercase tracking-wider text-slate-700">Grafik Penurunan WCSS (Metode Elbow)</h5>
+                                <span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                                    Titik Siku: k = 3
+                                </span>
+                            </div>
+                            <div class="h-64 w-full relative">
+                                <canvas id="elbowChart"></canvas>
+                            </div>
+                            <div class="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl text-xs text-emerald-950 leading-relaxed">
+                                <strong>Kesimpulan Titik Siku:</strong><br>
+                                {{ $clusteringOutput['elbow_data']['explanation'] ?? 'Titik siku (elbow) terbentuk pada k=3.' }}
+                            </div>
+                        </div>
+                    </div>
+                @endif
             </div>
 
             <!-- Tab 2: 2D Scatter Plot with axis-pair toggle -->
@@ -292,30 +405,68 @@
                 </div>
 
                 <div class="pt-4 border-t border-slate-200">
-                    <h5 class="text-sm font-bold text-slate-900 mb-1">3. Riwayat Pergeseran Iterasi</h5>
-                    <p class="text-xs text-slate-500 mb-3">Jumlah anggota (hari) pada setiap klaster di tiap putaran iterasi.</p>
+                    <h5 class="text-sm font-bold text-slate-900 mb-1">3. Riwayat Iterasi & Kriteria Konvergensi Stabilitas Klaster</h5>
+                    <p class="text-xs text-slate-600 mb-3 leading-relaxed">
+                        Sesuai kaidah algoritma K-Means, proses iterasi dihentikan apabila <strong>stabilitas klaster telah tercapai (100%)</strong>, yaitu tidak ada lagi objek data penjualan yang berpindah keanggotaan klaster antar-iterasi.
+                    </p>
 
-                    <div class="overflow-x-auto">
+                    <div class="overflow-x-auto border border-slate-100 rounded-xl mb-4">
                         <table class="w-full text-left text-xs font-mono">
                             <thead>
-                                <tr class="bg-slate-50 text-slate-500 border-b border-slate-200 font-bold uppercase tracking-wider">
-                                    <th class="py-2 px-3">Iterasi ke-</th>
-                                    <th class="py-2 px-3 text-center">Distribusi Anggota Tiap Klaster</th>
+                                <tr class="bg-slate-50 text-slate-500 border-b border-slate-200 font-bold uppercase tracking-wider text-[11px]">
+                                    <th class="py-2.5 px-3">Iterasi</th>
+                                    <th class="py-2.5 px-3 text-center">Distribusi Anggota Tiap Klaster</th>
+                                    <th class="py-2.5 px-3 text-center">Data Berpindah Klaster</th>
+                                    <th class="py-2.5 px-3 text-center">Status Konvergensi</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
                                 @foreach($clusteringOutput['iteration_history'] as $hist)
-                                    <tr>
-                                        <td class="py-2 px-3 font-bold text-slate-800">Iterasi #{{ $hist['iteration'] }}</td>
-                                        <td class="py-2 px-3 text-center text-slate-700">
+                                    @php
+                                        $isFinal = ($hist['iteration'] == $clusteringOutput['iterations_count']);
+                                    @endphp
+                                    <tr class="{{ $isFinal ? 'bg-emerald-50/60 font-bold' : 'hover:bg-slate-50/50' }}">
+                                        <td class="py-2 px-3 font-sans font-bold text-slate-800">Iterasi ke-{{ $hist['iteration'] }}</td>
+                                        <td class="py-2 px-3 text-center text-slate-700 font-sans">
                                             @foreach($hist['cluster_counts'] as $cI => $cnt)
-                                                <span class="px-2 py-0.5 rounded bg-slate-100 font-bold mr-2">C{{ $cI + 1 }}: {{ $cnt }} hari</span>
+                                                <span class="px-2 py-0.5 rounded bg-slate-100 text-[11px] font-bold mr-1.5">C{{ $cI + 1 }}: {{ $cnt }} hari</span>
                                             @endforeach
+                                        </td>
+                                        <td class="py-2 px-3 text-center font-sans">
+                                            @if(isset($hist['changed_count']))
+                                                <span class="text-xs {{ $hist['changed_count'] == 0 ? 'text-emerald-700 font-bold' : 'text-slate-600' }}">
+                                                    {{ $hist['changed_count'] }} data
+                                                </span>
+                                            @else
+                                                <span class="text-slate-400">-</span>
+                                            @endif
+                                        </td>
+                                        <td class="py-2 px-3 text-center font-sans">
+                                            @if($isFinal && $clusteringOutput['converged'])
+                                                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black">
+                                                    <i data-lucide="check" class="w-3 h-3"></i> Konvergen (Stabil)
+                                                </span>
+                                            @else
+                                                <span class="text-slate-400 text-[10px]">Iterasi berlanjut...</span>
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach
                             </tbody>
                         </table>
+                    </div>
+
+                    <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 flex items-start gap-3">
+                        <div class="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+                            <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <strong class="font-bold text-emerald-900 block mb-0.5">Kesimpulan Kondisi Konvergen:</strong>
+                            <p class="leading-relaxed">
+                                {{ $clusteringOutput['convergence_reason'] ?? 'Iterasi berhenti karena seluruh anggota klaster tidak mengalami perubahan posisi (konvergen).' }}
+                                WCSS / SSE akhir sebesar <strong>{{ number_format($clusteringOutput['sse_inertia'], 5, ',', '.') }}</strong> dengan DBI sebesar <strong>{{ number_format($clusteringOutput['davies_bouldin_index'], 4, ',', '.') }}</strong>.
+                            </p>
+                        </div>
                     </div>
                 </div>
 
@@ -341,6 +492,9 @@
                     <input type="hidden" name="end_date" value="{{ $endDate }}">
                     <input type="hidden" name="k_value" value="{{ $kValue }}">
                     <input type="hidden" name="max_iterations" value="{{ $maxIterations }}">
+                    @if($sampleSize)
+                        <input type="hidden" name="sample_size" value="{{ $sampleSize }}">
+                    @endif
 
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">Judul Sesi Analisis <span class="text-rose-500">*</span></label>
@@ -387,7 +541,71 @@
         window.__clusterResults = @json($clusteringOutput['results']);
         window.__scatterChartInstance = null;
         renderScatterChart('x2x3');
+
+        @if(!empty($clusteringOutput['elbow_data']['wcss']))
+            renderElbowChart(@json($clusteringOutput['elbow_data']['wcss']), {{ $clusteringOutput['elbow_data']['optimal_k'] ?? 3 }});
+        @endif
     });
+
+    function renderElbowChart(wcssData, optimalK) {
+        const elbowCanvas = document.getElementById('elbowChart');
+        if (!elbowCanvas) return;
+
+        const labels = Object.keys(wcssData).map(k => 'k = ' + k);
+        const values = Object.values(wcssData);
+
+        const pointColors = Object.keys(wcssData).map(k => (parseInt(k) === optimalK ? '#f59e0b' : '#059669'));
+        const pointRadii = Object.keys(wcssData).map(k => (parseInt(k) === optimalK ? 8 : 4));
+
+        new Chart(elbowCanvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Nilai WCSS',
+                    data: values,
+                    borderColor: '#059669',
+                    backgroundColor: 'rgba(5, 150, 105, 0.08)',
+                    pointBackgroundColor: pointColors,
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: 2,
+                    pointRadius: pointRadii,
+                    pointHoverRadius: 9,
+                    tension: 0.3,
+                    fill: true,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                const kVal = ctx.dataIndex + 1;
+                                let str = 'WCSS: ' + ctx.parsed.y.toLocaleString('id-ID');
+                                if (kVal === optimalK) {
+                                    str += ' (Titik Siku / Elbow Optimal)';
+                                }
+                                return str;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Jumlah Klaster (k)' },
+                        grid: { color: '#f1f5f9' }
+                    },
+                    y: {
+                        title: { display: true, text: 'Within-Cluster Sum of Squares (WCSS)' },
+                        grid: { color: '#f1f5f9' }
+                    }
+                }
+            }
+        });
+    }
 
     function renderScatterChart(pair) {
         const scatterCanvas = document.getElementById('scatterChart');

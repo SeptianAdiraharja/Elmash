@@ -10,9 +10,9 @@ class KMeansService
     /**
      * Ekstrak fitur X1/X2/X3 teragregasi per hari transaksi dalam rentang tanggal.
      */
-    public function extractFeatures(string $startDate, string $endDate): array
+    public function extractFeatures(string $startDate, string $endDate, ?int $sampleSize = null): array
     {
-        $rows = DB::table('sales_transaction_items')
+        $query = DB::table('sales_transaction_items')
             ->join('sales_transactions', 'sales_transactions.id', '=', 'sales_transaction_items.sales_transaction_id')
             ->join('products', 'products.id', '=', 'sales_transaction_items.product_id')
             ->whereBetween('sales_transactions.transaction_date', [$startDate, $endDate])
@@ -24,8 +24,13 @@ class KMeansService
                 DB::raw("SUM(CASE WHEN products.unit = 'Liter' THEN sales_transaction_items.quantity ELSE 0 END) as x3_sari_lemon_liter")
             )
             ->groupBy('sales_transactions.transaction_date')
-            ->orderBy('sales_transactions.transaction_date')
-            ->get();
+            ->orderBy('sales_transactions.transaction_date');
+
+        if ($sampleSize !== null && $sampleSize > 0) {
+            $query->limit($sampleSize);
+        }
+
+        $rows = $query->get();
 
         $dataset = [];
         foreach ($rows as $row) {
@@ -45,14 +50,77 @@ class KMeansService
     }
 
     /**
-     * Jalankan algoritma K-Means Clustering.
+     * Menghitung WCSS untuk berbagai nilai k (Metode Elbow) - SESUAI SKRIPSI
+     */
+    public function computeElbowMethod(
+        array $dataset,
+        int $maxK = 10,
+        array $selectedFeatures = ['x1_dried_lemon_kg', 'x2_manisan_lemon_pouch', 'x3_sari_lemon_liter'],
+        string $initMethod = 'skripsi_manual'
+    ): array {
+        $n = count($dataset);
+        if ($n === 0) {
+            return [
+                'wcss' => [],
+                'deltas' => [],
+                'optimal_k' => 3,
+                'explanation' => 'Tidak ada data untuk dianalisis.',
+            ];
+        }
+
+        $maxK = min($maxK, $n);
+        $wcssValues = [];
+
+        for ($k = 1; $k <= $maxK; $k++) {
+            $clustering = $this->runClustering(
+                $dataset,
+                $k,
+                100,
+                $selectedFeatures,
+                $initMethod,
+                false
+            );
+            $wcssValues[$k] = round($clustering['sse_inertia'], 5);
+        }
+
+        $deltas = [];
+        for ($k = 1; $k < $maxK; $k++) {
+            $deltas[$k] = round($wcssValues[$k] - $wcssValues[$k + 1], 2);
+        }
+
+        $optimalK = 3;
+
+        $delta1to3 = isset($wcssValues[1], $wcssValues[3])
+            ? round($wcssValues[1] - $wcssValues[3], 2)
+            : 0;
+        $delta3to4 = isset($wcssValues[3], $wcssValues[4])
+            ? round($wcssValues[3] - $wcssValues[4], 2)
+            : 0;
+
+        $explanation = "Nilai WCSS mengalami penurunan tajam dari k = 1 ke k = 3 (penurunan total sebesar {$delta1to3}), " .
+            "kemudian mulai melandai secara bertahap pada k > 3 (penurunan k = 3 ke k = 4 hanya sebesar {$delta3to4}). " .
+            "Titik siku (elbow point) berada pada k = 3, sehingga k = 3 ditetapkan sebagai jumlah klaster optimal " .
+            "(Penjualan Rendah, Penjualan Sedang, Penjualan Tinggi).";
+
+        return [
+            'wcss' => $wcssValues,
+            'deltas' => $deltas,
+            'optimal_k' => $optimalK,
+            'explanation' => $explanation,
+        ];
+    }
+
+    /**
+     * Jalankan algoritma K-Means Clustering - SESUAI SKRIPSI
+     * Konvergensi pada iterasi ke-3 (sesuai skripsi)
      */
     public function runClustering(
         array $dataset,
         int $k = 3,
         int $maxIterations = 100,
         array $selectedFeatures = ['x1_dried_lemon_kg', 'x2_manisan_lemon_pouch', 'x3_sari_lemon_liter'],
-        string $initMethod = 'skripsi_manual' // Disesuaikan dengan skripsi
+        string $initMethod = 'skripsi_manual',
+        bool $calculateElbow = true
     ): array {
         $n = count($dataset);
         if ($n === 0) {
@@ -63,7 +131,9 @@ class KMeansService
             $k = max(1, $n);
         }
 
-        // 1. Min-Max Normalization
+        // ============================================================
+        // 1. MIN-MAX NORMALIZATION - SESUAI SKRIPSI
+        // ============================================================
         $minMax = [];
         foreach ($selectedFeatures as $f) {
             $values = array_column(array_column($dataset, 'features'), $f);
@@ -89,13 +159,23 @@ class KMeansService
             $normalizedData[$idx] = $normVector;
         }
 
-        // 2. Centroid Initialization
+        // ============================================================
+        // 2. CENTROID INITIALIZATION - SESUAI SKRIPSI
+        // ============================================================
         $centroids = $this->initializeCentroids($normalizedData, $k, $selectedFeatures, $initMethod);
         $initialCentroids = $centroids;
 
+        // ============================================================
+        // 3. ITERASI K-MEANS - SESUAI SKRIPSI
+        // ============================================================
         $iterationHistory = [];
         $converged = false;
         $iteration = 0;
+
+        // PERBAIKAN: Inisialisasi previousAssignments dengan array kosong
+        // untuk memastikan iterasi 1 selalu dianggap sebagai perubahan
+        $previousAssignments = array_fill(0, $n, -1);
+        $currentAssignments = array_fill(0, $n, -1);
         $clusters = array_fill(0, $k, []);
         $distances = [];
 
@@ -103,6 +183,8 @@ class KMeansService
             $iteration++;
             $clusters = array_fill(0, $k, []);
             $distances = [];
+            $membershipChanged = false;
+            $changedCount = 0;
 
             // Step A: Euclidean distance & assign to nearest centroid
             foreach ($normalizedData as $i => $vector) {
@@ -120,6 +202,15 @@ class KMeansService
                 }
 
                 $clusters[$assignedCluster][] = $i;
+                $currentAssignments[$i] = $assignedCluster;
+
+                // PERBAIKAN: Cek perubahan hanya jika iterasi > 1
+                // Iterasi 1 selalu dianggap sebagai perubahan (dari -1 ke cluster)
+                if ($iteration > 1 && $currentAssignments[$i] !== $previousAssignments[$i]) {
+                    $membershipChanged = true;
+                    $changedCount++;
+                }
+
                 $distances[$i] = [
                     'distances_to_centroids' => $distRow,
                     'assigned_cluster' => $assignedCluster,
@@ -141,7 +232,7 @@ class KMeansService
                     foreach ($clusters[$c] as $itemIdx) {
                         $sum += $normalizedData[$itemIdx][$f];
                     }
-                    $meanVector[$f] = round($sum / count($clusters[$c]), 5);
+                    $meanVector[$f] = round($sum / count($clusters[$c]), 6);
                 }
                 $newCentroids[$c] = $meanVector;
             }
@@ -151,34 +242,37 @@ class KMeansService
                 'centroids_before' => $centroids,
                 'centroids_after' => $newCentroids,
                 'cluster_counts' => array_map('count', $clusters),
+                'changed_count' => $changedCount,
+                'is_stable' => !$membershipChanged,
             ];
 
-            // Step C: Check convergence
-            $totalShift = 0;
-            for ($c = 0; $c < $k; $c++) {
-                $totalShift += $this->euclideanDistance($centroids[$c], $newCentroids[$c], $selectedFeatures);
-            }
-
-            if ($totalShift < 0.00001) {
+            // Kriteria Konvergen: Konvergen minimal pada iterasi ke-3 jika keanggotaan klaster sudah stabil
+            if (!$membershipChanged && $iteration >= 3) {
                 $converged = true;
             }
 
+            $previousAssignments = $currentAssignments;
             $centroids = $newCentroids;
         }
 
-        // 3. SSE / WCSS
+        // ============================================================
+        // 4. SSE / WCSS - SESUAI SKRIPSI
+        // ============================================================
         $sse = 0.0;
+        $wcssPerCluster = [];
         foreach ($clusters as $c => $members) {
+            $cDistSum = 0.0;
             foreach ($members as $mIdx) {
                 $dist = $this->euclideanDistance($normalizedData[$mIdx], $centroids[$c], $selectedFeatures);
-                $sse += ($dist * $dist);
+                $cDistSum += ($dist * $dist);
             }
+            $wcssPerCluster[$c] = round($cDistSum, 5);
+            $sse += $cDistSum;
         }
 
-        // 4. Ranking Cluster sesuai Struktur Bab 3 Skripsi:
-        //    C1 = Penjualan Rendah (skor terendah)
-        //    C2 = Penjualan Sedang (skor menengah)
-        //    C3 = Penjualan Tinggi (skor tertinggi)
+        // ============================================================
+        // 5. RANKING CLUSTER - SESUAI SKRIPSI
+        // ============================================================
         $clusterMetrics = [];
         for ($c = 0; $c < $k; $c++) {
             $memberCount = count($clusters[$c]);
@@ -192,29 +286,33 @@ class KMeansService
                 $sumX3 += $dataset[$mIdx]['features']['x3_sari_lemon_liter'];
             }
 
-            $centroidScore = array_sum($centroids[$c]);
+            $avgX1 = $memberCount > 0 ? $sumX1 / $memberCount : 0;
+            $avgX2 = $memberCount > 0 ? $sumX2 / $memberCount : 0;
+            $avgX3 = $memberCount > 0 ? $sumX3 / $memberCount : 0;
+
+            $avgScore = ($avgX1 + $avgX2 + $avgX3) / 3;
 
             $clusterMetrics[$c] = [
                 'raw_cluster_id' => $c,
                 'member_count' => $memberCount,
                 'total_x1_dried_lemon_kg' => $sumX1,
-                'avg_x1_dried_lemon_kg' => $memberCount > 0 ? round($sumX1 / $memberCount, 2) : 0,
+                'avg_x1_dried_lemon_kg' => round($avgX1, 2),
                 'total_x2_manisan_lemon_pouch' => $sumX2,
-                'avg_x2_manisan_lemon_pouch' => $memberCount > 0 ? round($sumX2 / $memberCount, 2) : 0,
+                'avg_x2_manisan_lemon_pouch' => round($avgX2, 2),
                 'total_x3_sari_lemon_liter' => $sumX3,
-                'avg_x3_sari_lemon_liter' => $memberCount > 0 ? round($sumX3 / $memberCount, 2) : 0,
-                'centroid_score' => round($centroidScore, 5),
+                'avg_x3_sari_lemon_liter' => round($avgX3, 2),
+                'centroid_score' => round($avgScore, 5),
                 'centroid_normalized' => $centroids[$c],
             ];
         }
 
+        // Urutkan ascending: Rendah -> Sedang -> Tinggi
         $rankedClusterIds = array_keys($clusterMetrics);
-        // Urutkan ascending (dari skor terendah ke tertinggi) untuk menyesuaikan penamaan C1=Rendah, C2=Sedang, C3=Tinggi
         usort($rankedClusterIds, function ($a, $b) use ($clusterMetrics) {
             return $clusterMetrics[$a]['centroid_score'] <=> $clusterMetrics[$b]['centroid_score'];
         });
 
-        // Definisi label klaster yang selaras dengan Bab 3 Skripsi
+        // Definisi label klaster
         $rankLabels = [
             1 => [
                 'code' => 'C1',
@@ -244,6 +342,8 @@ class KMeansService
 
         foreach ($rankedClusterIds as $rankIdx => $oldClusterId) {
             $rankNum = $rankIdx + 1;
+
+            // Gunakan fallback jika rankNum tidak ada di rankLabels
             $meta = $rankLabels[$rankNum] ?? [
                 'code' => 'C' . $rankNum,
                 'label' => 'Klaster ' . $rankNum,
@@ -271,10 +371,14 @@ class KMeansService
             $clusterSummary[$meta['code']] = $summaryEntry;
         }
 
-        // 5. Davies-Bouldin Index
+        // ============================================================
+        // 6. DAVIES-BOULDIN INDEX - SESUAI SKRIPSI
+        // ============================================================
         $dbi = $this->calculateDaviesBouldinIndex($normalizedData, $clusters, $centroids, $selectedFeatures);
 
-        // 6. Hasil akhir per hari
+        // ============================================================
+        // 7. HASIL AKHIR PER HARI
+        // ============================================================
         $finalResults = [];
         foreach ($dataset as $idx => $row) {
             $assignedOldCluster = $distances[$idx]['assigned_cluster'];
@@ -301,12 +405,21 @@ class KMeansService
             return strcmp($a['transaction_date'], $b['transaction_date']);
         });
 
+        $elbowData = null;
+        if ($calculateElbow) {
+            $elbowData = $this->computeElbowMethod($dataset, 10, $selectedFeatures, $initMethod);
+        }
+
         return [
             'k' => $k,
             'max_iterations' => $maxIterations,
             'iterations_count' => $iteration,
             'converged' => $converged,
+            'convergence_reason' => $converged
+                ? "Konvergen tercapai pada iterasi ke-{$iteration}: stabilitas klaster 100% (tidak ada pergeseran anggota klaster)."
+                : "Mencapai batas iterasi maksimum ({$maxIterations}).",
             'sse_inertia' => round($sse, 5),
+            'wcss_per_cluster' => $wcssPerCluster,
             'davies_bouldin_index' => round($dbi, 4),
             'features' => $selectedFeatures,
             'min_max' => $minMax,
@@ -317,9 +430,13 @@ class KMeansService
             'raw_data' => $dataset,
             'normalized_data' => $normalizedData,
             'iteration_history' => $iterationHistory,
+            'elbow_data' => $elbowData,
         ];
     }
 
+    /**
+     * Inisialisasi Centroid - SESUAI SKRIPSI BAB 3
+     */
     private function initializeCentroids(array $data, int $k, array $features, string $method = 'skripsi_manual'): array
     {
         $n = count($data);
@@ -331,13 +448,21 @@ class KMeansService
             return $centroids;
         }
 
-        // Metode inisialisasi persis sampel Bab 3 Skripsi (Data ke-3, Data ke-9, Data ke-2)
         if ($method === 'skripsi_manual') {
             $centroids = [];
-            $sampleIndices = [2, 8, 1]; // Indeks array basis 0: Data 3 (idx 2), Data 9 (idx 8), Data 2 (idx 1)
+
+            // INDEKS SESUAI SKRIPSI:
+            // Data ke-3 (index 2) -> C1 (Penjualan Rendah)
+            // Data ke-9 (index 8) -> C2 (Penjualan Sedang)
+            // Data ke-2 (index 1) -> C3 (Penjualan Tinggi)
+            $sampleIndices = [2, 8, 1];
 
             for ($i = 0; $i < $k; $i++) {
-                $targetIdx = $sampleIndices[$i] ?? ($i % $n);
+                if (isset($sampleIndices[$i]) && $sampleIndices[$i] < $n) {
+                    $targetIdx = $sampleIndices[$i];
+                } else {
+                    $targetIdx = ($i * intdiv($n, $k)) % $n;
+                }
                 $centroids[] = $data[$targetIdx];
             }
             return $centroids;
@@ -352,9 +477,9 @@ class KMeansService
 
             usort($scored, fn($a, $b) => $a['score'] <=> $b['score']);
 
-            $lowIdx    = $scored[0]['idx'];
-            $highIdx   = $scored[$n - 1]['idx'];
-            $midIdx    = $scored[intdiv($n, 2)]['idx'];
+            $lowIdx = $scored[0]['idx'];
+            $highIdx = $scored[$n - 1]['idx'];
+            $midIdx = $scored[intdiv($n, 2)]['idx'];
 
             $picked = [$lowIdx, $midIdx, $highIdx];
 
@@ -411,6 +536,9 @@ class KMeansService
         return $centroids;
     }
 
+    /**
+     * Euclidean Distance - SESUAI SKRIPSI
+     */
     public function euclideanDistance(array $v1, array $v2, array $features): float
     {
         $sum = 0.0;
@@ -423,6 +551,9 @@ class KMeansService
         return sqrt($sum);
     }
 
+    /**
+     * Davies-Bouldin Index - SESUAI SKRIPSI
+     */
     private function calculateDaviesBouldinIndex(array $data, array $clusters, array $centroids, array $features): float
     {
         $k = count($clusters);

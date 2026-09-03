@@ -25,17 +25,21 @@ class ClusteringController extends Controller
 
     /**
      * Main Clustering Execution Studio.
+     * SESUAI SKRIPSI: Default menggunakan metode 'skripsi_manual'
      */
     public function index(Request $request)
     {
-        // Default: 300 hari sesuai simulasi skripsi (2 Jan 2025 - 28 Okt 2025)
-        $startDate = $request->get('start_date', '2025-01-02');
-        $endDate = $request->get('end_date', '2025-10-28');
+        // Default sesuai skripsi: data dari 01/09/2025 s/d 27/04/2026
+        $startDate = $request->get('start_date', '2025-09-01');
+        $endDate = $request->get('end_date', '2026-04-27');
         $kValue = (int) $request->get('k_value', 3);
         $maxIterations = (int) $request->get('max_iterations', 100);
-        $initMethod = $request->get('init_method', 'kmeans_plus');
 
-        $dataset = $this->kMeansService->extractFeatures($startDate, $endDate);
+        // SESUAI SKRIPSI: Default menggunakan 'skripsi_manual'
+        $initMethod = $request->get('init_method', 'skripsi_manual');
+        $sampleSize = $request->filled('sample_size') ? (int) $request->get('sample_size') : null;
+
+        $dataset = $this->kMeansService->extractFeatures($startDate, $endDate, $sampleSize);
 
         $clusteringOutput = null;
         $hasRun = $request->has('run') || $request->isMethod('post');
@@ -51,11 +55,14 @@ class ClusteringController extends Controller
         }
 
         return view('clustering.index', compact(
-            'startDate', 'endDate', 'kValue', 'maxIterations', 'initMethod',
+            'startDate', 'endDate', 'kValue', 'maxIterations', 'initMethod', 'sampleSize',
             'dataset', 'clusteringOutput', 'hasRun'
         ));
     }
 
+    /**
+     * Save Clustering Result to Database.
+     */
     public function save(Request $request)
     {
         $request->validate([
@@ -63,16 +70,21 @@ class ClusteringController extends Controller
             'start_date' => ['required', 'date'],
             'end_date' => ['required', 'date'],
             'k_value' => ['required', 'integer', 'min:2', 'max:5'],
+            'sample_size' => ['nullable', 'integer', 'min:3'],
             'notes' => ['nullable', 'string'],
+            'init_method' => ['nullable', 'string', 'in:skripsi_manual,representative,kmeans_plus'],
         ]);
 
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
         $kValue = (int) $request->input('k_value');
         $maxIterations = (int) $request->input('max_iterations', 100);
-        $initMethod = $request->input('init_method', 'kmeans_plus');
 
-        $dataset = $this->kMeansService->extractFeatures($startDate, $endDate);
+        // SESUAI SKRIPSI: Default 'skripsi_manual'
+        $initMethod = $request->input('init_method', 'skripsi_manual');
+        $sampleSize = $request->filled('sample_size') ? (int) $request->input('sample_size') : null;
+
+        $dataset = $this->kMeansService->extractFeatures($startDate, $endDate, $sampleSize);
         $output = $this->kMeansService->runClustering(
             $dataset, $kValue, $maxIterations,
             ['x1_dried_lemon_kg', 'x2_manisan_lemon_pouch', 'x3_sari_lemon_liter'],
@@ -97,6 +109,7 @@ class ClusteringController extends Controller
                 'cluster_summary' => $output['cluster_summary'],
                 'raw_data_snapshot' => $output['raw_data'],
                 'iteration_history' => $output['iteration_history'],
+                'elbow_data' => $output['elbow_data'], // PERBAIKAN: Simpan elbow data
                 'notes' => $request->input('notes'),
                 'created_by' => Auth::id(),
             ]);
@@ -141,7 +154,28 @@ class ClusteringController extends Controller
     public function show(ClusteringAnalysis $clustering)
     {
         $clustering->load(['results', 'user']);
-        return view('clustering.show', compact('clustering'));
+
+        // Siapkan elbow data untuk ditampilkan di view
+        $elbowData = null;
+
+        // PERBAIKAN: Cek elbow_data dari database terlebih dahulu
+        if ($clustering->elbow_data) {
+            $elbowData = $clustering->elbow_data;
+        } elseif ($clustering->raw_data_snapshot) {
+            try {
+                $dataset = $clustering->raw_data_snapshot;
+                $elbowData = $this->kMeansService->computeElbowMethod(
+                    $dataset,
+                    10,
+                    ['x1_dried_lemon_kg', 'x2_manisan_lemon_pouch', 'x3_sari_lemon_liter'],
+                    'skripsi_manual'
+                );
+            } catch (\Exception $e) {
+                $elbowData = null;
+            }
+        }
+
+        return view('clustering.show', compact('clustering', 'elbowData'));
     }
 
     /**
