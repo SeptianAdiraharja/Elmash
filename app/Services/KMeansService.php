@@ -32,7 +32,7 @@ class KMeansService
             $date = Carbon::parse($row->transaction_date);
             $dataset[] = [
                 'transaction_date' => $date->toDateString(),
-                'day_name' => $date->translatedFormat('l, d-m-Y'), // butuh App::setLocale('id')
+                'day_name' => $date->translatedFormat('l, d-m-Y'),
                 'features' => [
                     'x1_dried_lemon_kg' => (int) $row->x1_dried_lemon_kg,
                     'x2_manisan_lemon_pouch' => (int) $row->x2_manisan_lemon_pouch,
@@ -52,7 +52,7 @@ class KMeansService
         int $k = 3,
         int $maxIterations = 100,
         array $selectedFeatures = ['x1_dried_lemon_kg', 'x2_manisan_lemon_pouch', 'x3_sari_lemon_liter'],
-        string $initMethod = 'kmeans_plus'
+        string $initMethod = 'skripsi_manual' // Disesuaikan dengan skripsi
     ): array {
         $n = count($dataset);
         if ($n === 0) {
@@ -166,7 +166,7 @@ class KMeansService
             $centroids = $newCentroids;
         }
 
-        // 3. SSE / WCSS (sesuai Tabel 3.3 skripsi)
+        // 3. SSE / WCSS
         $sse = 0.0;
         foreach ($clusters as $c => $members) {
             foreach ($members as $mIdx) {
@@ -175,8 +175,10 @@ class KMeansService
             }
         }
 
-        // 4. Ranking cluster berdasarkan jumlah nilai centroid ternormalisasi
-        //    (konsisten dengan Tabel 3.11 skripsi: C1 Tinggi > C3 Sedang > C2 Rendah)
+        // 4. Ranking Cluster sesuai Struktur Bab 3 Skripsi:
+        //    C1 = Penjualan Rendah (skor terendah)
+        //    C2 = Penjualan Sedang (skor menengah)
+        //    C3 = Penjualan Tinggi (skor tertinggi)
         $clusterMetrics = [];
         for ($c = 0; $c < $k; $c++) {
             $memberCount = count($clusters[$c]);
@@ -190,7 +192,7 @@ class KMeansService
                 $sumX3 += $dataset[$mIdx]['features']['x3_sari_lemon_liter'];
             }
 
-            $centroidScore = array_sum($centroids[$c]); // jumlah X1_norm+X2_norm+X3_norm
+            $centroidScore = array_sum($centroids[$c]);
 
             $clusterMetrics[$c] = [
                 'raw_cluster_id' => $c,
@@ -207,17 +209,19 @@ class KMeansService
         }
 
         $rankedClusterIds = array_keys($clusterMetrics);
+        // Urutkan ascending (dari skor terendah ke tertinggi) untuk menyesuaikan penamaan C1=Rendah, C2=Sedang, C3=Tinggi
         usort($rankedClusterIds, function ($a, $b) use ($clusterMetrics) {
-            return $clusterMetrics[$b]['centroid_score'] <=> $clusterMetrics[$a]['centroid_score'];
+            return $clusterMetrics[$a]['centroid_score'] <=> $clusterMetrics[$b]['centroid_score'];
         });
 
+        // Definisi label klaster yang selaras dengan Bab 3 Skripsi
         $rankLabels = [
             1 => [
                 'code' => 'C1',
-                'label' => 'Penjualan Tinggi',
-                'badge' => 'emerald',
-                'description' => 'Hari dengan volume pengiriman Dried Lemon, Manisan Lemon, dan Sari Lemon yang tinggi.',
-                'strategy' => 'Tingkatkan pengadaan bahan baku lemon segar (buffer stock) untuk mencegah stockout pada pola hari seperti ini.',
+                'label' => 'Penjualan Rendah',
+                'badge' => 'rose',
+                'description' => 'Hari dengan volume pengiriman ketiga variabel yang rendah.',
+                'strategy' => 'Kurangi pengadaan bahan baku lemon segar pada pola hari seperti ini untuk mencegah overstock/pembusukan.',
             ],
             2 => [
                 'code' => 'C2',
@@ -228,10 +232,10 @@ class KMeansService
             ],
             3 => [
                 'code' => 'C3',
-                'label' => 'Penjualan Rendah',
-                'badge' => 'rose',
-                'description' => 'Hari dengan volume pengiriman ketiga variabel yang rendah.',
-                'strategy' => 'Kurangi pengadaan bahan baku lemon segar pada pola hari seperti ini untuk mencegah overstock/pembusukan.',
+                'label' => 'Penjualan Tinggi',
+                'badge' => 'emerald',
+                'description' => 'Hari dengan volume pengiriman Dried Lemon, Manisan Lemon, dan Sari Lemon yang tinggi.',
+                'strategy' => 'Tingkatkan pengadaan bahan baku lemon segar (buffer stock) untuk mencegah stockout pada pola hari seperti ini.',
             ],
         ];
 
@@ -267,7 +271,7 @@ class KMeansService
             $clusterSummary[$meta['code']] = $summaryEntry;
         }
 
-        // 5. Davies-Bouldin Index (validasi tambahan, di luar skripsi tapi tetap berguna)
+        // 5. Davies-Bouldin Index
         $dbi = $this->calculateDaviesBouldinIndex($normalizedData, $clusters, $centroids, $selectedFeatures);
 
         // 6. Hasil akhir per hari
@@ -293,7 +297,6 @@ class KMeansService
             ];
         }
 
-        // Urutkan berdasarkan tanggal
         usort($finalResults, function ($a, $b) {
             return strcmp($a['transaction_date'], $b['transaction_date']);
         });
@@ -317,7 +320,7 @@ class KMeansService
         ];
     }
 
-    private function initializeCentroids(array $data, int $k, array $features, string $method = 'kmeans_plus'): array
+    private function initializeCentroids(array $data, int $k, array $features, string $method = 'skripsi_manual'): array
     {
         $n = count($data);
         if ($n <= $k) {
@@ -328,17 +331,48 @@ class KMeansService
             return $centroids;
         }
 
-        if ($method === 'spread') {
+        // Metode inisialisasi persis sampel Bab 3 Skripsi (Data ke-3, Data ke-9, Data ke-2)
+        if ($method === 'skripsi_manual') {
             $centroids = [];
-            $step = max(1, floor($n / $k));
+            $sampleIndices = [2, 8, 1]; // Indeks array basis 0: Data 3 (idx 2), Data 9 (idx 8), Data 2 (idx 1)
+
             for ($i = 0; $i < $k; $i++) {
-                $idx = min($n - 1, (int) ($i * $step));
-                $centroids[] = $data[$idx];
+                $targetIdx = $sampleIndices[$i] ?? ($i % $n);
+                $centroids[] = $data[$targetIdx];
             }
             return $centroids;
         }
 
-        // K-Means++
+        if ($method === 'representative') {
+            $scored = [];
+            foreach ($data as $idx => $vector) {
+                $score = array_sum(array_intersect_key($vector, array_flip($features)));
+                $scored[] = ['idx' => $idx, 'score' => $score];
+            }
+
+            usort($scored, fn($a, $b) => $a['score'] <=> $b['score']);
+
+            $lowIdx    = $scored[0]['idx'];
+            $highIdx   = $scored[$n - 1]['idx'];
+            $midIdx    = $scored[intdiv($n, 2)]['idx'];
+
+            $picked = [$lowIdx, $midIdx, $highIdx];
+
+            if ($k > 3) {
+                $step = max(1, intdiv($n, $k));
+                for ($i = 0; $i < $k; $i++) {
+                    $picked[$i] = $scored[min($n - 1, $i * $step)]['idx'];
+                }
+            }
+
+            $centroids = [];
+            for ($i = 0; $i < $k; $i++) {
+                $centroids[] = $data[$picked[$i]];
+            }
+            return $centroids;
+        }
+
+        // K-Means++ Default
         $centroids = [];
         $centroids[] = $data[0];
 
