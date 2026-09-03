@@ -264,7 +264,7 @@ class ExportService
         $sheet3->getStyle('A1')->getFont()->setBold(true);
         $sheet3->mergeCells('A1:D1');
 
-        $iterHeaders = ['Iterasi', 'Distribusi Anggota Klaster', 'Data Berpindah', 'Status Konvergensi'];
+        $iterHeaders = ['Iterasi', 'Distribusi Anggota Klaster', 'Pergeseran Maks Centroid', 'Status Konvergensi'];
         $sheet3->fromArray($iterHeaders, null, 'A3');
         $sheet3->getStyle('A3:D3')->getFont()->setBold(true);
         $sheet3->getStyle('A3:D3')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFFACC15');
@@ -279,8 +279,8 @@ class ExportService
                 }
                 $sheet3->setCellValue('A' . $row, 'Iterasi ke-' . $hist['iteration']);
                 $sheet3->setCellValue('B' . $row, trim($distribusi));
-                $sheet3->setCellValue('C' . $row, $hist['changed_count'] ?? 0);
-                $sheet3->setCellValue('D' . $row, $isLast ? 'Stabil 100% (Konvergen)' : 'Pergeseran Anggota');
+                $sheet3->setCellValue('C' . $row, isset($hist['max_centroid_shift']) ? number_format($hist['max_centroid_shift'], 4, ',', '.') : ($hist['changed_count'] ?? 0));
+                $sheet3->setCellValue('D' . $row, $isLast ? 'Stabil 100% (Centroid Konvergen)' : 'Centroid Bergeser');
 
                 if ($isLast) {
                     $sheet3->getStyle('A' . $row . ':D' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFD1FAE5');

@@ -80,7 +80,7 @@ class KMeansService
                 $initMethod,
                 false
             );
-            $wcssValues[$k] = round($clustering['sse_inertia'], 5);
+            $wcssValues[$k] = round($clustering['sse_inertia'], 4);
         }
 
         $deltas = [];
@@ -153,7 +153,7 @@ class KMeansService
                 if ($max - $min == 0) {
                     $normVector[$f] = 0.0;
                 } else {
-                    $normVector[$f] = round(($val - $min) / ($max - $min), 5);
+                    $normVector[$f] = round(($val - $min) / ($max - $min), 4);
                 }
             }
             $normalizedData[$idx] = $normVector;
@@ -193,9 +193,9 @@ class KMeansService
                 $distRow = [];
 
                 for ($c = 0; $c < $k; $c++) {
-                    $dist = $this->euclideanDistance($vector, $centroids[$c], $selectedFeatures);
-                    $distRow[$c] = round($dist, 5);
-                    if ($dist < $minDist) {
+                    $dist = round($this->euclideanDistance($vector, $centroids[$c], $selectedFeatures), 4);
+                    $distRow[$c] = $dist;
+                    if ($dist < $minDist || ($dist == $minDist && $c < $assignedCluster)) {
                         $minDist = $dist;
                         $assignedCluster = $c;
                     }
@@ -214,7 +214,7 @@ class KMeansService
                 $distances[$i] = [
                     'distances_to_centroids' => $distRow,
                     'assigned_cluster' => $assignedCluster,
-                    'min_distance' => round($minDist, 5),
+                    'min_distance' => round($minDist, 4),
                 ];
             }
 
@@ -232,9 +232,22 @@ class KMeansService
                     foreach ($clusters[$c] as $itemIdx) {
                         $sum += $normalizedData[$itemIdx][$f];
                     }
-                    $meanVector[$f] = round($sum / count($clusters[$c]), 6);
+                    $meanVector[$f] = round($sum / count($clusters[$c]), 4);
                 }
                 $newCentroids[$c] = $meanVector;
+            }
+
+            // Step C: Cek perubahan posisi centroid antar-iterasi (kriteria konvergensi centroid)
+            $centroidChanged = false;
+            $maxCentroidShift = 0.0;
+            for ($c = 0; $c < $k; $c++) {
+                $shift = $this->euclideanDistance($centroids[$c], $newCentroids[$c], $selectedFeatures);
+                if ($shift > $maxCentroidShift) {
+                    $maxCentroidShift = $shift;
+                }
+                if (round($shift, 4) > 0) {
+                    $centroidChanged = true;
+                }
             }
 
             $iterationHistory[] = [
@@ -243,11 +256,12 @@ class KMeansService
                 'centroids_after' => $newCentroids,
                 'cluster_counts' => array_map('count', $clusters),
                 'changed_count' => $changedCount,
-                'is_stable' => !$membershipChanged,
+                'max_centroid_shift' => round($maxCentroidShift, 4),
+                'is_stable' => !$centroidChanged,
             ];
 
-            // Kriteria Konvergen: Konvergen minimal pada iterasi ke-3 jika keanggotaan klaster sudah stabil
-            if (!$membershipChanged && $iteration >= 3) {
+            // Kriteria Konvergen: Konvergen jika posisi centroid tidak lagi berubah (shift = 0)
+            if (!$centroidChanged && $iteration >= 3) {
                 $converged = true;
             }
 
@@ -266,7 +280,7 @@ class KMeansService
                 $dist = $this->euclideanDistance($normalizedData[$mIdx], $centroids[$c], $selectedFeatures);
                 $cDistSum += ($dist * $dist);
             }
-            $wcssPerCluster[$c] = round($cDistSum, 5);
+            $wcssPerCluster[$c] = round($cDistSum, 4);
             $sse += $cDistSum;
         }
 
@@ -416,9 +430,9 @@ class KMeansService
             'iterations_count' => $iteration,
             'converged' => $converged,
             'convergence_reason' => $converged
-                ? "Konvergen tercapai pada iterasi ke-{$iteration}: stabilitas klaster 100% (tidak ada pergeseran anggota klaster)."
+                ? "Konvergen tercapai pada iterasi ke-{$iteration}: posisi centroid stabil 100% (tidak ada perubahan nilai centroid)."
                 : "Mencapai batas iterasi maksimum ({$maxIterations}).",
-            'sse_inertia' => round($sse, 5),
+            'sse_inertia' => round($sse, 4),
             'wcss_per_cluster' => $wcssPerCluster,
             'davies_bouldin_index' => round($dbi, 4),
             'features' => $selectedFeatures,

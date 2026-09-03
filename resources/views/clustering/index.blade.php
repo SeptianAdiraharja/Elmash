@@ -364,7 +364,7 @@
                                         <td class="py-2 px-3 text-right text-slate-600">{{ $r['x2_manisan_lemon_pouch'] }}</td>
                                         <td class="py-2 px-3 text-right text-slate-600">{{ $r['x3_sari_lemon_liter'] }}</td>
                                         <td class="py-2 px-3 text-center text-emerald-700 font-bold">
-                                            [{{ implode(', ', array_values($r['normalized_vector'])) }}]
+                                            [{{ implode(', ', array_map(fn($v) => number_format((float)$v, 4, '.', ''), array_values($r['normalized_vector']))) }}]
                                         </td>
                                     </tr>
                                 @endforeach
@@ -384,7 +384,7 @@
                                 @foreach($clusteringOutput['initial_centroids'] as $cIdx => $cVec)
                                     <div>
                                         <span class="font-bold text-slate-700">C{{ $cIdx + 1 }}:</span>
-                                        [{{ implode(', ', $cVec) }}]
+                                        [{{ implode(', ', array_map(fn($v) => number_format((float)$v, 4, '.', ''), $cVec)) }}]
                                     </div>
                                 @endforeach
                             </div>
@@ -396,7 +396,7 @@
                                 @foreach($clusteringOutput['final_centroids'] as $cIdx => $cVec)
                                     <div>
                                         <span class="font-bold text-emerald-800">C{{ $cIdx + 1 }}:</span>
-                                        [{{ implode(', ', $cVec) }}]
+                                        [{{ implode(', ', array_map(fn($v) => number_format((float)$v, 4, '.', ''), $cVec)) }}]
                                     </div>
                                 @endforeach
                             </div>
@@ -405,9 +405,9 @@
                 </div>
 
                 <div class="pt-4 border-t border-slate-200">
-                    <h5 class="text-sm font-bold text-slate-900 mb-1">3. Riwayat Iterasi & Kriteria Konvergensi Stabilitas Klaster</h5>
+                    <h5 class="text-sm font-bold text-slate-900 mb-1">3. Riwayat Iterasi & Kriteria Konvergensi Posisi Centroid</h5>
                     <p class="text-xs text-slate-600 mb-3 leading-relaxed">
-                        Sesuai kaidah algoritma K-Means, proses iterasi dihentikan apabila <strong>stabilitas klaster telah tercapai (100%)</strong>, yaitu tidak ada lagi objek data penjualan yang berpindah keanggotaan klaster antar-iterasi.
+                        Sesuai kaidah algoritma K-Means, proses iterasi dihentikan apabila <strong>posisi centroid telah stabil (100%)</strong>, yaitu tidak ada lagi pergeseran nilai koordinat centroid antar-iterasi (pergeseran = 0).
                     </p>
 
                     <div class="overflow-x-auto border border-slate-100 rounded-xl mb-4">
@@ -416,7 +416,7 @@
                                 <tr class="bg-slate-50 text-slate-500 border-b border-slate-200 font-bold uppercase tracking-wider text-[11px]">
                                     <th class="py-2.5 px-3">Iterasi</th>
                                     <th class="py-2.5 px-3 text-center">Distribusi Anggota Tiap Klaster</th>
-                                    <th class="py-2.5 px-3 text-center">Data Berpindah Klaster</th>
+                                    <th class="py-2.5 px-3 text-center">Pergeseran Maks Centroid</th>
                                     <th class="py-2.5 px-3 text-center">Status Konvergensi</th>
                                 </tr>
                             </thead>
@@ -433,9 +433,9 @@
                                             @endforeach
                                         </td>
                                         <td class="py-2 px-3 text-center font-sans">
-                                            @if(isset($hist['changed_count']))
-                                                <span class="text-xs {{ $hist['changed_count'] == 0 ? 'text-emerald-700 font-bold' : 'text-slate-600' }}">
-                                                    {{ $hist['changed_count'] }} data
+                                            @if(isset($hist['max_centroid_shift']))
+                                                <span class="text-xs {{ $hist['max_centroid_shift'] == 0 ? 'text-emerald-700 font-bold' : 'text-slate-600' }}">
+                                                    {{ number_format($hist['max_centroid_shift'], 4, ',', '.') }}
                                                 </span>
                                             @else
                                                 <span class="text-slate-400">-</span>
@@ -444,7 +444,7 @@
                                         <td class="py-2 px-3 text-center font-sans">
                                             @if($isFinal && $clusteringOutput['converged'])
                                                 <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black">
-                                                    <i data-lucide="check" class="w-3 h-3"></i> Konvergen (Stabil)
+                                                    <i data-lucide="check" class="w-3 h-3"></i> Konvergen (Centroid Stabil)
                                                 </span>
                                             @else
                                                 <span class="text-slate-400 text-[10px]">Iterasi berlanjut...</span>

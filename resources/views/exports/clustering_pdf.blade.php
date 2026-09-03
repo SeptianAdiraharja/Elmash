@@ -496,10 +496,10 @@
 <div class="note-box">
     Proses iterasi K-Means dilakukan secara berulang dengan tahapan penentuan centroid,
     penghitungan jarak Euclidean, penentuan anggota klaster, dan pembaruan posisi centroid.
-    Kriteria penghentian algoritma (konvergensi) menggunakan <strong>kriteria stabilitas klaster</strong>,
-    yaitu iterasi dihentikan apabila seluruh objek data penjualan tidak lagi berpindah klaster antar-putaran (stabilitas keanggotaan 100%).
+    Kriteria penghentian algoritma (konvergensi) menggunakan <strong>kriteria stabilitas centroid</strong>,
+    yaitu iterasi dihentikan apabila posisi centroid klaster tidak lagi mengalami perubahan/pergeseran nilai (pergeseran centroid = 0).
     <br><br>
-    <strong>Kondisi konvergen tercapai pada: iterasi ke-{{ $analysis->iterations_count }}</strong> dengan status keanggotaan klaster yang telah stabil sempurna.
+    <strong>Kondisi konvergen tercapai pada: iterasi ke-{{ $analysis->iterations_count }}</strong> dengan posisi centroid klaster yang telah stabil sempurna.
 </div>
 
 @if(!empty($analysis->iteration_history))
