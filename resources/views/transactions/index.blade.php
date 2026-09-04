@@ -12,7 +12,7 @@
         <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex items-center justify-between">
             <div>
                 <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Total Transaksi</span>
-                <h4 class="text-xl font-black text-slate-900 mt-1">{{ number_format($totalCount, 0, ',', '.') }} <span class="text-xs font-semibold text-slate-400">Nota</span></h4>
+                <h4 class="text-xl font-black text-slate-900 mt-1">{{ number_format($totalCount, 0, ',', '.',) }} <span class="text-xs font-semibold text-slate-400">Nota</span></h4>
             </div>
             <div class="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center">
                 <i data-lucide="receipt" class="w-5 h-5"></i>

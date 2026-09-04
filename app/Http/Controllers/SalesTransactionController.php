@@ -297,7 +297,7 @@ class SalesTransactionController extends Controller
         try {
             // Load file Excel
             $spreadsheet = IOFactory::load($request->file('file')->getRealPath());
-            $rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
+            $rows = $spreadsheet->getActiveSheet()->toArray(null, true, false, false);
 
             if (empty($rows)) {
                 return back()->with('error', 'File Excel kosong atau tidak terbaca.');
@@ -349,6 +349,8 @@ class SalesTransactionController extends Controller
             'sari lemon (liter)' => 'qty_sari',
             'total sari lemon' => 'total_sari',
             'total harus dibayar' => 'total_all',
+            'status pembayaran' => 'status',
+            'metode pembayaran' => 'method',
         ];
 
         foreach ($rows as $index => $row) {
@@ -413,27 +415,25 @@ class SalesTransactionController extends Controller
 
         for ($i = $headerRowIndex + 1; $i < count($rows); $i++) {
             $row = $rows[$i];
-
-            // Skip baris kosong
             if (empty(array_filter($row))) continue;
 
-            // Skip baris total / jumlah
             $firstCell = trim((string) ($row[0] ?? ''));
             if (stripos($firstCell, 'Jumlah') !== false || stripos($firstCell, 'Total') !== false) {
                 continue;
             }
 
-            // Parse tanggal
             $date = $this->parseDate($row[$colMap['date']] ?? '');
             if (!$date) continue;
 
             $dateKey = $date->format('Y-m-d');
-
-            // Baca data per produk
             $productData = $this->extractProductData($row, $colMap);
 
             if (!empty($productData)) {
-                $dailyData[$dateKey] = $productData;
+                $dailyData[$dateKey] = [
+                    'items'  => $productData,
+                    'status' => trim((string) ($row[$colMap['status'] ?? -1] ?? '')) ?: 'Lunas',
+                    'method' => trim((string) ($row[$colMap['method'] ?? -1] ?? '')) ?: 'Tidak Diketahui',
+                ];
             }
         }
 
@@ -485,23 +485,27 @@ class SalesTransactionController extends Controller
         $updatedPrices = [];
 
         DB::transaction(function () use ($dailyData, $products, &$imported, &$skipped, &$updatedPrices) {
-            foreach ($dailyData as $dateKey => $productData) {
-                // Skip jika tidak ada produk
-                if (empty($productData)) {
+            foreach ($dailyData as $dateKey => $entry) {
+                if (empty($entry['items'])) {
                     $skipped++;
                     continue;
                 }
 
                 $invoiceNumber = $this->generateInvoiceNumber($dateKey);
 
-                // Skip jika sudah ada
                 if (SalesTransaction::where('invoice_number', $invoiceNumber)->exists()) {
                     $skipped++;
                     continue;
                 }
 
-                // Buat transaksi
-                $result = $this->createTransactionFromData($dateKey, $productData, $products, $invoiceNumber);
+                $result = $this->createTransactionFromData(
+                    $dateKey,
+                    $entry['items'],
+                    $products,
+                    $invoiceNumber,
+                    $entry['status'],
+                    $entry['method']
+                );
 
                 if ($result['success']) {
                     $imported++;
@@ -525,8 +529,14 @@ class SalesTransactionController extends Controller
     /**
      * Buat transaksi dari data
      */
-    private function createTransactionFromData(string $dateKey, array $productData, array $products, string $invoiceNumber): array
-    {
+    private function createTransactionFromData(
+        string $dateKey,
+        array $productData,
+        array $products,
+        string $invoiceNumber,
+        string $status = 'Lunas',
+        string $method = 'Tidak Diketahui'
+    ): array {
         $itemsToCreate = [];
         $notesParts = [];
         $subtotal = 0;
@@ -569,14 +579,14 @@ class SalesTransactionController extends Controller
         }
 
         // Buat transaksi
-        $transaction = SalesTransaction::create([
+         $transaction = SalesTransaction::create([
             'invoice_number' => $invoiceNumber,
             'transaction_date' => $dateKey,
             'customer_name' => 'Data Historis (Import Excel)',
             'customer_phone' => null,
             'sales_channel' => 'Import Data Historis',
-            'payment_method' => 'Tidak Diketahui (Import)',
-            'payment_status' => 'Lunas',
+            'payment_method' => $method,   // <-- diambil dari Excel
+            'payment_status' => $status,   // <-- diambil dari Excel
             'subtotal' => $subtotal,
             'discount' => 0,
             'tax' => 0,

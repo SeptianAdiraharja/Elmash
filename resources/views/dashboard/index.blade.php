@@ -36,7 +36,7 @@
 
     <!-- 4 KPI Metric Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        
+
         <!-- Card 1: Total Omset -->
         <div class="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs hover:shadow-md transition">
             <div class="flex items-center justify-between">
@@ -94,7 +94,7 @@
                 </div>
             </div>
             <div class="mt-4">
-                <h4 class="text-2xl font-black text-slate-900 tracking-tight">{{ number_format($totalTransactions, 0, ',', '.') }} <span class="text-sm font-semibold text-slate-400">Nota/PO</span></h4>
+                <h4 class="text-2xl font-black text-slate-900 tracking-tight">{{ number_format($totalTransactions, 0, ',', '.') }} <span class="text-sm font-semibold text-slate-400">Nota</span></h4>
                 <p class="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
                     Transaksi lunas dan terverifikasi
                 </p>
@@ -105,7 +105,7 @@
 
     <!-- 2 Charts Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
+
         <!-- Left: Sales Trend Line/Area Chart (2 Cols) -->
         <div class="lg:col-span-2 bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-xs">
             <div class="flex items-center justify-between mb-6">
@@ -129,7 +129,7 @@
             <div>
                 <h4 class="text-base font-bold text-slate-900">Distribusi Saluran Penjualan</h4>
                 <p class="text-xs text-slate-500 mb-4">Kontribusi omset berdasarkan saluran distribusi</p>
-                
+
                 <div class="h-56 w-full relative flex items-center justify-center">
                     <canvas id="channelChart"></canvas>
                 </div>
@@ -149,7 +149,7 @@
 
     <!-- Active Clustering Highlight & Raw Lemon Balance Problem Tracker -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
+
         <!-- Clustering Latest Result Widget (2 Cols) -->
         <div class="lg:col-span-2 bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-xs">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
@@ -270,7 +270,7 @@
 
     <!-- Bottom Tables: Top Products & Recent Transactions -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
+
         <!-- Top 5 Products -->
         <div class="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-xs">
             <div class="flex items-center justify-between mb-6">
@@ -322,7 +322,7 @@
             <div class="flex items-center justify-between mb-6">
                 <div>
                     <h4 class="text-base font-bold text-slate-900">Transaksi Penjualan Terbaru</h4>
-                    <p class="text-xs text-slate-500">Catatan faktur / PO harian terbaru</p>
+                    <p class="text-xs text-slate-500">Catatan faktur harian terbaru</p>
                 </div>
                 <a href="{{ route('transactions.index') }}" class="text-xs text-emerald-600 font-semibold hover:underline">Lihat Semua Transaksi &rarr;</a>
             </div>
