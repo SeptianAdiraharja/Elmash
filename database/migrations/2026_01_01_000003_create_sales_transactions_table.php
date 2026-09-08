@@ -10,13 +10,13 @@ return new class extends Migration
     {
         Schema::create('sales_transactions', function (Blueprint $table) {
             $table->id();
-            $table->string('invoice_number')->unique();
+            $table->string('invoice_number', 30)->unique();
             $table->date('transaction_date')->index();
-            $table->string('customer_name');
-            $table->string('customer_phone')->nullable();
-            $table->string('sales_channel')->default('Toko Offline');
-            $table->string('payment_method')->default('Cash / Tunai');
-            $table->string('payment_status')->default('Lunas');
+            $table->string('customer_name', 50);
+            $table->string('customer_phone', 20)->nullable();
+            $table->string('sales_channel', 40)->default('Toko Offline');
+            $table->string('payment_method', 30)->default('Cash / Tunai');
+            $table->string('payment_status', 25)->default('Lunas');
             $table->decimal('subtotal', 14, 2)->default(0);
             $table->decimal('discount', 14, 2)->default(0);
             $table->decimal('tax', 14, 2)->default(0);

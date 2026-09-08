@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('raw_lemon_stocks', function (Blueprint $table) {
             $table->id();
             $table->string('period_month', 7)->unique()->comment('Format YYYY-MM');
-            $table->string('status')->comment('Kelebihan / Kekurangan / Seimbang');
+            $table->string('status', 30)->comment('Kelebihan / Kekurangan / Seimbang');
             $table->decimal('quantity_kg', 10, 2)->default(0);
             $table->decimal('inbound_kg', 10, 2)->default(0);
             $table->decimal('used_in_production_kg', 10, 2)->default(0);

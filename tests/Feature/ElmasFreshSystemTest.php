@@ -23,6 +23,8 @@ class ElmasFreshSystemTest extends TestCase
         parent::setUp();
 
         $this->seed();
+        $this->seed(\Database\Seeders\ProductSeeder::class);
+        $this->seed(\Database\Seeders\SalesTransactionSeeder::class);
         $this->admin = User::where('email', 'admin@elmasfresh.id')->first();
     }
 

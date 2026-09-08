@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('clustering_analyses', function (Blueprint $table) {
             $table->id();
-            $table->string('title');
+            $table->string('title', 100);
             $table->date('period_start');
             $table->date('period_end');
             $table->integer('k_value')->default(3);

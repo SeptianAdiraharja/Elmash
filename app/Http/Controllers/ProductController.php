@@ -72,9 +72,9 @@ class ProductController extends Controller
     {
         $validated = $request->validate([
             'category_id' => ['required', 'exists:categories,id'],
-            'code' => ['required', 'string', 'max:50', 'unique:products,code'],
-            'name' => ['required', 'string', 'max:255'],
-            'unit' => ['required', 'string', 'max:50'],
+            'code' => ['required', 'string', 'max:30', 'unique:products,code'],
+            'name' => ['required', 'string', 'max:80'],
+            'unit' => ['required', 'string', 'max:20'],
             'raw_lemon_requirement' => ['required', 'numeric', 'min:0'],
             'cost_price' => ['required', 'numeric', 'min:0'],
             'selling_price' => ['required', 'numeric', 'min:0'],
@@ -141,9 +141,9 @@ class ProductController extends Controller
     {
         $validated = $request->validate([
             'category_id' => ['required', 'exists:categories,id'],
-            'code' => ['required', 'string', 'max:50', 'unique:products,code,' . $product->id],
-            'name' => ['required', 'string', 'max:255'],
-            'unit' => ['required', 'string', 'max:50'],
+            'code' => ['required', 'string', 'max:30', 'unique:products,code,' . $product->id],
+            'name' => ['required', 'string', 'max:80'],
+            'unit' => ['required', 'string', 'max:20'],
             'raw_lemon_requirement' => ['required', 'numeric', 'min:0'],
             'cost_price' => ['required', 'numeric', 'min:0'],
             'selling_price' => ['required', 'numeric', 'min:0'],

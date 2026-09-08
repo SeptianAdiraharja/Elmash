@@ -129,10 +129,10 @@ class SalesTransactionController extends Controller
     {
         $request->validate([
             'transaction_date' => ['required', 'date'],
-            'customer_name' => ['required', 'string', 'max:255'],
-            'sales_channel' => ['required', 'string'],
-            'payment_method' => ['required', 'string'],
-            'payment_status' => ['required', 'string'],
+            'customer_name' => ['required', 'string', 'max:80'],
+            'sales_channel' => ['required', 'string', 'max:40'],
+            'payment_method' => ['required', 'string', 'max:30'],
+            'payment_status' => ['required', 'string', 'max:25'],
             'discount' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
@@ -225,11 +225,11 @@ class SalesTransactionController extends Controller
     {
         $validated = $request->validate([
             'transaction_date' => ['required', 'date'],
-            'customer_name' => ['required', 'string', 'max:255'],
-            'customer_phone' => ['nullable', 'string', 'max:50'],
-            'sales_channel' => ['required', 'string'],
-            'payment_method' => ['required', 'string'],
-            'payment_status' => ['required', 'string'],
+            'customer_name' => ['required', 'string', 'max:80'],
+            'customer_phone' => ['nullable', 'string', 'max:20'],
+            'sales_channel' => ['required', 'string', 'max:40'],
+            'payment_method' => ['required', 'string', 'max:30'],
+            'payment_status' => ['required', 'string', 'max:25'],
             'notes' => ['nullable', 'string'],
         ]);
 
