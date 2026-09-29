@@ -7,6 +7,7 @@
 @section('content')
 <div class="space-y-8">
 
+    <!-- Header Navigation & Action Buttons -->
     <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <a href="{{ route('clustering.history') }}" class="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-slate-900 transition">
             <i data-lucide="arrow-left" class="w-4 h-4"></i>
@@ -25,6 +26,7 @@
         </div>
     </div>
 
+    <!-- Overview Banner -->
     <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl">
         <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div>
@@ -48,49 +50,60 @@
         </div>
     </div>
 
+    <!-- Cluster Summary Cards & Information -->
     @if(is_array($clustering->cluster_summary))
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-            @foreach($clustering->cluster_summary as $code => $summ)
-                @php
-                    $isC1 = $code == 'C1';
-                    $isC2 = $code == 'C2';
-                    $cardBg = $isC1 ? 'bg-emerald-50/80 border-emerald-200' : ($isC2 ? 'bg-amber-50/80 border-amber-200' : 'bg-rose-50/80 border-rose-200');
-                    $badgeStyle = $isC1 ? 'bg-emerald-600 text-white' : ($isC2 ? 'bg-amber-500 text-slate-950' : 'bg-rose-500 text-white');
-                @endphp
-                <div class="rounded-3xl p-6 border {{ $cardBg }} shadow-xs flex flex-col justify-between space-y-4">
-                    <div>
-                        <div class="flex items-center justify-between">
-                            <span class="px-3 py-1 rounded-xl text-xs font-black {{ $badgeStyle }} shadow-2xs">{{ $code }}</span>
-                            <span class="text-xs font-bold text-slate-700">{{ $summ['member_count'] ?? 0 }} Hari</span>
+        <div class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                @foreach($clustering->cluster_summary as $code => $summ)
+                    @php
+                        $isC1 = $code == 'C1';
+                        $isC2 = $code == 'C2';
+                        $cardBg = $isC1 ? 'bg-rose-50/80 border-rose-200' : ($isC2 ? 'bg-amber-50/80 border-amber-200' : 'bg-emerald-50/80 border-emerald-200');
+                        $badgeStyle = $isC1 ? 'bg-rose-500 text-white' : ($isC2 ? 'bg-amber-500 text-slate-950' : 'bg-emerald-600 text-white');
+                    @endphp
+                    <div class="rounded-3xl p-6 border {{ $cardBg }} shadow-xs flex flex-col justify-between space-y-4">
+                        <div>
+                            <div class="flex items-center justify-between">
+                                <span class="px-3 py-1 rounded-xl text-xs font-black {{ $badgeStyle }} shadow-2xs">{{ $code }}</span>
+                                <span class="text-xs font-bold text-slate-700">{{ $summ['member_count'] ?? 0 }} Hari</span>
+                            </div>
+                            <h4 class="text-base font-extrabold text-slate-900 mt-3">{{ $summ['cluster_label'] ?? 'Klaster' }}</h4>
+                            <p class="text-xs text-slate-600 mt-1 leading-relaxed">{{ $summ['description'] ?? '-' }}</p>
                         </div>
-                        <h4 class="text-base font-extrabold text-slate-900 mt-3">{{ $summ['cluster_label'] ?? 'Klaster' }}</h4>
-                        <p class="text-xs text-slate-600 mt-1 leading-relaxed">{{ $summ['description'] ?? '-' }}</p>
-                    </div>
 
-                    <div class="space-y-2 pt-3 border-t border-black/5 text-xs">
-                        <div class="flex justify-between text-slate-600">
-                            <span>Rata-rata X1 (Dried Lemon):</span>
-                            <strong class="text-slate-900 font-extrabold">{{ number_format($summ['avg_x1_dried_lemon_kg'] ?? 0, 2, ',', '.') }} Kg</strong>
+                        <div class="space-y-2 pt-3 border-t border-black/5 text-xs">
+                            <div class="flex justify-between text-slate-600">
+                                <span>Rata-rata X1 (Dried Lemon):</span>
+                                <strong class="text-slate-900 font-extrabold">{{ number_format($summ['avg_x1_dried_lemon_kg'] ?? 0, 2, ',', '.') }} Kg</strong>
+                            </div>
+                            <div class="flex justify-between text-slate-600">
+                                <span>Rata-rata X2 (Manisan Lemon):</span>
+                                <strong class="text-slate-900 font-extrabold">{{ number_format($summ['avg_x2_manisan_lemon_pouch'] ?? 0, 0, ',', '.') }} Pouch</strong>
+                            </div>
+                            <div class="flex justify-between text-slate-600">
+                                <span>Rata-rata X3 (Sari Lemon):</span>
+                                <strong class="text-slate-900 font-extrabold">{{ number_format($summ['avg_x3_sari_lemon_liter'] ?? 0, 0, ',', '.') }} Liter</strong>
+                            </div>
                         </div>
-                        <div class="flex justify-between text-slate-600">
-                            <span>Rata-rata X2 (Manisan Lemon):</span>
-                            <strong class="text-slate-900 font-extrabold">{{ number_format($summ['avg_x2_manisan_lemon_pouch'] ?? 0, 0, ',', '.') }} Pouch</strong>
-                        </div>
-                        <div class="flex justify-between text-slate-600">
-                            <span>Rata-rata X3 (Sari Lemon):</span>
-                            <strong class="text-slate-900 font-extrabold">{{ number_format($summ['avg_x3_sari_lemon_liter'] ?? 0, 0, ',', '.') }} Liter</strong>
-                        </div>
-                    </div>
 
-                    <div class="p-3.5 rounded-2xl bg-white/80 border border-black/5 text-[11px] text-slate-700 leading-relaxed">
-                        <strong class="text-slate-900 block mb-0.5">Strategi Pengelolaan Stok:</strong>
-                        {{ $summ['strategy'] ?? '-' }}
+                        <div class="p-3.5 rounded-2xl bg-white/80 border border-black/5 text-[11px] text-slate-700 leading-relaxed">
+                            <strong class="text-slate-900 block mb-0.5">Strategi Pengelolaan Stok:</strong>
+                            {{ $summ['strategy'] ?? '-' }}
+                        </div>
                     </div>
-                </div>
-            @endforeach
+                @endforeach
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-slate-900 text-slate-200 text-[11px] leading-relaxed">
+                <strong class="text-white block mb-0.5">Cara membaca grafik:</strong>
+                Semakin ke kanan (sumbu X) dan semakin ke atas (sumbu Y), semakin besar volume penjualan produk pada hari tersebut.
+                Gunakan tombol pasangan sumbu (X1 vs X2, X1 vs X3, X2 vs X3) untuk melihat pemisahan klaster dari sudut pandang produk yang berbeda.
+                Klaster yang terpisah jelas dan tidak saling tumpang tindih menandakan hasil segmentasi yang baik.
+            </div>
         </div>
     @endif
 
+    <!-- 2D Scatter Chart Section -->
     <div class="bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-xs space-y-4" x-data="{ chartPair: 'x2x3' }">
         <div class="flex items-center justify-between flex-wrap gap-3">
             <div>
@@ -114,6 +127,7 @@
         </div>
     </div>
 
+    <!-- Data Table Section -->
     <div class="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div class="p-6 border-b border-slate-100 flex items-center justify-between">
             <div>
@@ -138,7 +152,7 @@
                 <tbody class="divide-y divide-slate-100">
                     @foreach($clustering->results as $idx => $res)
                         @php
-                            $badge = $res->cluster_code == 'C1' ? 'bg-emerald-100 text-emerald-800' : ($res->cluster_code == 'C2' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800');
+                            $badge = $res->cluster_code == 'C1' ? 'bg-rose-100 text-rose-800' : ($res->cluster_code == 'C2' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800');
                         @endphp
                         <tr class="hover:bg-slate-50/80 transition">
                             <td class="py-3.5 px-4 text-slate-400 font-semibold">{{ $idx + 1 }}</td>
@@ -191,9 +205,9 @@
         const axis = axisMap[pair] || axisMap['x2x3'];
 
         const clusterColors = {
-            'C1': { bg: 'rgba(5, 150, 105, 0.8)', border: '#059669', label: 'C1 - Penjualan Tinggi' },
+            'C1': { bg: 'rgba(244, 63, 94, 0.8)',  border: '#e11d48', label: 'C1 - Penjualan Tinggi' },
             'C2': { bg: 'rgba(245, 158, 11, 0.8)', border: '#d97706', label: 'C2 - Penjualan Sedang' },
-            'C3': { bg: 'rgba(244, 63, 94, 0.8)', border: '#e11d48', label: 'C3 - Penjualan Rendah' },
+            'C3': { bg: 'rgba(5, 150, 105, 0.8)',  border: '#059669', label: 'C3 - Penjualan Rendah' },
         };
 
         const datasetsByCluster = {};
@@ -202,8 +216,12 @@
             if (!datasetsByCluster[code]) {
                 const meta = clusterColors[code] || { bg: '#64748b', border: '#334155', label: code };
                 datasetsByCluster[code] = {
-                    label: meta.label, data: [], backgroundColor: meta.bg, borderColor: meta.border,
-                    pointRadius: 6, pointHoverRadius: 9,
+                    label: meta.label,
+                    data: [],
+                    backgroundColor: meta.bg,
+                    borderColor: meta.border,
+                    pointRadius: 6,
+                    pointHoverRadius: 9,
                 };
             }
             datasetsByCluster[code].data.push({ x: r[axis.xKey], y: r[axis.yKey], day: r.day_name });

@@ -117,8 +117,8 @@
                 @php
                     $isC1 = $code == 'C1';
                     $isC2 = $code == 'C2';
-                    $cardBg = $isC1 ? 'bg-emerald-50/80 border-emerald-200' : ($isC2 ? 'bg-amber-50/80 border-amber-200' : 'bg-rose-50/80 border-rose-200');
-                    $badgeStyle = $isC1 ? 'bg-emerald-600 text-white' : ($isC2 ? 'bg-amber-500 text-slate-950' : 'bg-rose-500 text-white');
+                    $cardBg = $isC1 ? 'bg-rose-50/80 border-rose-200' : ($isC2 ? 'bg-amber-50/80 border-amber-200' : 'bg-emerald-50/80 border-emerald-200');
+                    $badgeStyle = $isC1 ? 'bg-rose-500 text-white' : ($isC2 ? 'bg-amber-500 text-slate-950' : 'bg-emerald-600 text-white');
                 @endphp
                 <div class="rounded-3xl p-6 border {{ $cardBg }} shadow-sm flex flex-col justify-between space-y-4">
                     <div>
@@ -200,7 +200,7 @@
                         <tbody class="divide-y divide-slate-100">
                             @foreach($clusteringOutput['results'] as $idx => $res)
                                 @php
-                                    $badge = $res['cluster_code'] == 'C1' ? 'bg-emerald-100 text-emerald-800' : ($res['cluster_code'] == 'C2' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800');
+                                    $badge = $res['cluster_code'] == 'C1' ? 'bg-rose-100 text-rose-800' : ($res['cluster_code'] == 'C2' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800');
                                 @endphp
                                 <tr class="hover:bg-slate-50/80 transition">
                                     <td class="py-3.5 px-4 text-slate-400 font-semibold">{{ $idx + 1 }}</td>
@@ -333,6 +333,55 @@
                 </div>
                 <div class="h-96 w-full relative">
                     <canvas id="scatterChart"></canvas>
+                </div>
+                @php $totalHari = max(count($clusteringOutput['results']), 1); @endphp
+                <div class="pt-5 mt-2 border-t border-slate-100 space-y-4">
+                    <div>
+                        <h5 class="text-sm font-bold text-slate-900">Penjelasan Sebaran Klaster</h5>
+                        <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+                            Setiap titik pada grafik mewakili satu hari penjualan, dan warnanya menunjukkan klaster tempat hari tersebut dikelompokkan.
+                            Titik yang berdekatan memiliki pola penjualan yang mirip, sedangkan titik yang berjauhan berada pada klaster berbeda.
+                            Total terdapat <strong class="text-slate-700">{{ $totalHari }} hari</strong> data yang dikelompokkan menjadi <strong class="text-slate-700">{{ count($clusteringOutput['cluster_summary']) }} klaster</strong>.
+                        </p>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        @foreach($clusteringOutput['cluster_summary'] as $code => $summ)
+                            @php
+                                $jumlah = $summ['member_count'] ?? 0;
+                                $persen = round(($jumlah / $totalHari) * 100, 1);
+                                $dot = $code == 'C1' ? 'bg-rose-500' : ($code == 'C2' ? 'bg-amber-500' : 'bg-emerald-600');
+                                $namaWarna = $code == 'C1' ? 'merah' : ($code == 'C2' ? 'kuning' : 'hijau');
+                            @endphp
+                            <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-2.5">
+                                <div class="flex items-center justify-between gap-2">
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-3 h-3 rounded-full {{ $dot }}"></span>
+                                        <strong class="text-slate-900">{{ $code }} - {{ $summ['cluster_label'] ?? 'Klaster' }}</strong>
+                                    </div>
+                                    <span class="font-bold text-slate-700 whitespace-nowrap">{{ $jumlah }} hari ({{ number_format($persen, 1, ',', '.') }}%)</span>
+                                </div>
+
+                                <div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                    <div class="h-full {{ $dot }} rounded-full" style="width: {{ $persen }}%"></div>
+                                </div>
+
+                                <p class="text-slate-600 leading-relaxed">
+                                    Titik berwarna <strong>{{ $namaWarna }}</strong> adalah hari dengan rata-rata penjualan Dried Lemon
+                                    <strong>{{ number_format($summ['avg_x1_dried_lemon_kg'] ?? 0, 2, ',', '.') }} Kg</strong>,
+                                    Manisan Lemon <strong>{{ number_format($summ['avg_x2_manisan_lemon_pouch'] ?? 0, 0, ',', '.') }} Pouch</strong>,
+                                    dan Sari Lemon <strong>{{ number_format($summ['avg_x3_sari_lemon_liter'] ?? 0, 0, ',', '.') }} Liter</strong>.
+                                </p>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <div class="p-3.5 rounded-xl bg-slate-900 text-slate-200 text-[11px] leading-relaxed">
+                        <strong class="text-white block mb-0.5">Cara membaca grafik:</strong>
+                        Semakin ke kanan (sumbu X) dan semakin ke atas (sumbu Y), semakin besar volume penjualan produk pada hari tersebut.
+                        Gunakan tombol pasangan sumbu (X1 vs X2, X1 vs X3, X2 vs X3) untuk melihat pemisahan klaster dari sudut pandang produk yang berbeda.
+                        Klaster yang terpisah jelas dan tidak saling tumpang tindih menandakan hasil segmentasi yang baik.
+                    </div>
                 </div>
             </div>
 
@@ -551,11 +600,32 @@
         const elbowCanvas = document.getElementById('elbowChart');
         if (!elbowCanvas) return;
 
-        const labels = Object.keys(wcssData).map(k => 'k = ' + k);
+        const keys = Object.keys(wcssData);
+        const labels = keys.map(k => 'k = ' + k);
         const values = Object.values(wcssData);
 
-        const pointColors = Object.keys(wcssData).map(k => (parseInt(k) === optimalK ? '#f59e0b' : '#059669'));
-        const pointRadii = Object.keys(wcssData).map(k => (parseInt(k) === optimalK ? 8 : 4));
+        const pointColors = keys.map(k => (parseInt(k) === optimalK ? '#f59e0b' : '#059669'));
+        const pointRadii = keys.map(k => (parseInt(k) === optimalK ? 9 : 5));
+
+        // Garis putus-putus vertikal pada titik siku
+        const elbowMarker = {
+            id: 'elbowMarker',
+            afterDatasetsDraw(chart) {
+                const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
+                const idx = keys.findIndex(k => parseInt(k) === optimalK);
+                if (idx < 0) return;
+                const xPos = x.getPixelForValue(idx);
+                ctx.save();
+                ctx.setLineDash([5, 5]);
+                ctx.strokeStyle = '#f59e0b';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(xPos, top);
+                ctx.lineTo(xPos, bottom);
+                ctx.stroke();
+                ctx.restore();
+            }
+        };
 
         new Chart(elbowCanvas.getContext('2d'), {
             type: 'line',
@@ -565,16 +635,18 @@
                     label: 'Nilai WCSS',
                     data: values,
                     borderColor: '#059669',
-                    backgroundColor: 'rgba(5, 150, 105, 0.08)',
+                    borderWidth: 2.5,
+                    borderJoinStyle: 'miter',
                     pointBackgroundColor: pointColors,
                     pointBorderColor: '#ffffff',
                     pointBorderWidth: 2,
                     pointRadius: pointRadii,
-                    pointHoverRadius: 9,
-                    tension: 0.3,
-                    fill: true,
+                    pointHoverRadius: 10,
+                    tension: 0,      // garis lurus, siku lebih tajam
+                    fill: false,
                 }]
             },
+            plugins: [elbowMarker],
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
@@ -599,6 +671,7 @@
                         grid: { color: '#f1f5f9' }
                     },
                     y: {
+                        beginAtZero: true,
                         title: { display: true, text: 'Within-Cluster Sum of Squares (WCSS)' },
                         grid: { color: '#f1f5f9' }
                     }
@@ -620,9 +693,9 @@
         const axis = axisMap[pair] || axisMap['x2x3'];
 
         const clusterColors = {
-            'C1': { bg: 'rgba(5, 150, 105, 0.8)', border: '#059669', label: 'C1 - Penjualan Tinggi' },
+            'C1': { bg: 'rgba(244, 63, 94, 0.8)',  border: '#e11d48', label: 'C1 - Penjualan Tinggi' },
             'C2': { bg: 'rgba(245, 158, 11, 0.8)', border: '#d97706', label: 'C2 - Penjualan Sedang' },
-            'C3': { bg: 'rgba(244, 63, 94, 0.8)', border: '#e11d48', label: 'C3 - Penjualan Rendah' },
+            'C3': { bg: 'rgba(5, 150, 105, 0.8)',  border: '#059669', label: 'C3 - Penjualan Rendah' },
             'C4': { bg: 'rgba(100, 116, 139, 0.8)', border: '#475569', label: 'C4' },
         };
 

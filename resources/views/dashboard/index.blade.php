@@ -183,8 +183,8 @@
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                     @foreach($latestAnalysis->cluster_summary as $cCode => $cData)
                         @php
-                            $bgClass = $cCode == 'C1' ? 'bg-emerald-50 border-emerald-200 text-emerald-950' : ($cCode == 'C2' ? 'bg-amber-50 border-amber-200 text-amber-950' : 'bg-rose-50 border-rose-200 text-rose-950');
-                            $badgeClass = $cCode == 'C1' ? 'bg-emerald-600 text-white' : ($cCode == 'C2' ? 'bg-amber-500 text-slate-950' : 'bg-rose-500 text-white');
+                            $bgClass = $cCode == 'C1' ? 'bg-rose-50 border-rose-200 text-rose-950' : ($cCode == 'C2' ? 'bg-amber-50 border-amber-200 text-amber-950' : 'bg-emerald-50 border-emerald-200 text-emerald-950');
+                            $badgeClass = $cCode == 'C1' ? 'bg-rose-500 text-white' : ($cCode == 'C2' ? 'bg-amber-500 text-slate-950' : 'bg-emerald-600 text-white');
                         @endphp
                         <div class="p-4 rounded-2xl border {{ $bgClass }} flex flex-col justify-between">
                             <div>
